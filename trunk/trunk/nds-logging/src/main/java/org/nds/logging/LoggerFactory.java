@@ -3,6 +3,9 @@ package org.nds.logging;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.logging.AndroidLogFactory;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * <p>
  * Factory for creating {@link Logger} instances
@@ -18,12 +21,18 @@ public class LoggerFactory {
      */
     private static LoggerFactory factory = null;
 
+    private static boolean androidLoggable = false;
+
     /**
      * The {@link Logger} instances that have already been created, keyed by logger name.
      */
     private final Map<String, Logger> instances = new HashMap<String, Logger>();
 
     private LoggerFactory() {
+        if (android.os.Build.ID != null) {
+            System.out.println("ID: " + android.os.Build.ID);
+            androidLoggable = true;
+        }
     }
 
     private final synchronized static LoggerFactory getInstance() {
@@ -33,23 +42,21 @@ public class LoggerFactory {
         return factory;
     }
 
-    public final static Logger getLogger(String name, String tag) {
+    public final static Logger getLogger(String name) {
         Logger logger = getInstance().instances.get(name);
         if (logger == null) {
-            logger = new Logger(name, tag);
+            System.out.println("Android Loggable: " + androidLoggable);
+            if (androidLoggable) {
+                logger = new Logger(name, AndroidLogFactory.getLog(name));
+            } else {
+                logger = new Logger(name, LogFactory.getLog(name));
+            }
+            getInstance().instances.put(name, logger);
         }
         return logger;
     }
 
-    public final static Logger getLogger(String name) {
-        return getLogger(name, null);
-    }
-
-    public final static Logger getLogger(Class<?> clazz, String tag) {
-        return getLogger(clazz.getName(), tag);
-    }
-
     public final static Logger getLogger(Class<?> clazz) {
-        return getLogger(clazz, null);
+        return getLogger(clazz.getName());
     }
 }

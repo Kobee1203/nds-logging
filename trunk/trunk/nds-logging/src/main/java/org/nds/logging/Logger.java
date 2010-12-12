@@ -1,9 +1,6 @@
 package org.nds.logging;
 
 import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
-import android.util.Config;
 
 /**
  * <p>
@@ -89,184 +86,144 @@ import android.util.Config;
  */
 public class Logger {
 
-    private String TAG = "Logger";
-
     private final Log log;
 
-    private static Boolean verboseLoggable;
-    private static Boolean debugLoggable;
-    private static Boolean infoLoggable;
-    private static Boolean warnLoggable;
-    private static Boolean errorLoggable;
+    protected Logger(String name, Log log) {
+        this.log = log;
 
-    protected Logger(String name, String tag) {
-        this.TAG = tag != null ? tag : this.TAG;
-        try {
-            if (verboseLoggable == null) {
-                verboseLoggable = android.util.Log.isLoggable(TAG, android.util.Log.VERBOSE);
+        System.out.println("[" + name + "] trace enabled: " + log.isTraceEnabled());
+        System.out.println("[" + name + "] debug enabled: " + log.isDebugEnabled());
+        System.out.println("[" + name + "] info enabled: " + log.isInfoEnabled());
+        System.out.println("[" + name + "] warn enabled: " + log.isWarnEnabled());
+        System.out.println("[" + name + "] error enabled: " + log.isErrorEnabled());
+    }
+
+    public boolean isTraceEnabled() {
+        return log.isTraceEnabled();
+    }
+
+    public boolean isDebugEnabled() {
+        return log.isDebugEnabled();
+    }
+
+    public boolean isInfoEnabled() {
+        return log.isInfoEnabled();
+    }
+
+    public boolean isWarnEnabled() {
+        return log.isWarnEnabled();
+    }
+
+    public boolean isErrorEnabled() {
+        return log.isErrorEnabled();
+    }
+
+    public boolean isFatalEnabled() {
+        return log.isFatalEnabled();
+    }
+
+    public void trace(Object message, Object... params) {
+        if (isTraceEnabled()) {
+            if (params != null && params.length > 0 && params[0] instanceof Throwable) {
+                trace(message, params[0], paramsWithoutFirst(params));
+            } else {
+                log.trace(message);
             }
-        } catch (Throwable t) {
-            verboseLoggable = false;
         }
-        try {
-            if (debugLoggable == null) {
-                debugLoggable = android.util.Log.isLoggable(TAG, android.util.Log.DEBUG);
+    }
+
+    public void trace(String message, Throwable t, Object... params) {
+        if (isTraceEnabled()) {
+            log.trace(String.format(message, params), t);
+        }
+    }
+
+    public void debug(String message, Object... params) {
+        if (isDebugEnabled()) {
+            if (params != null && params.length > 0 && params[0] instanceof Throwable) {
+                debug(message, (Throwable) params[0], paramsWithoutFirst(params));
+            } else {
+                log.debug(String.format(message, params));
             }
-        } catch (Throwable t) {
-            debugLoggable = false;
         }
-        try {
-            if (infoLoggable == null) {
-                infoLoggable = android.util.Log.isLoggable(TAG, android.util.Log.INFO);
+    }
+
+    public void debug(String message, Throwable t, Object... params) {
+        if (isDebugEnabled()) {
+            log.debug(String.format(message, params), t);
+        }
+    }
+
+    public void info(String message, Object... params) {
+        if (isInfoEnabled()) {
+            if (params != null && params.length > 0 && params[0] instanceof Throwable) {
+                info(message, (Throwable) params[0], paramsWithoutFirst(params));
+            } else {
+                log.info(String.format(message, params));
             }
-        } catch (Throwable t) {
-            infoLoggable = false;
         }
-        try {
-            if (warnLoggable == null) {
-                warnLoggable = android.util.Log.isLoggable(TAG, android.util.Log.WARN);
+    }
+
+    public void info(String message, Throwable t, Object... params) {
+        if (isInfoEnabled()) {
+            log.info(String.format(message, params), t);
+        }
+    }
+
+    public void warn(String message, Object... params) {
+        if (isWarnEnabled()) {
+            if (params != null && params.length > 0 && params[0] instanceof Throwable) {
+                warn(message, (Throwable) params[0], paramsWithoutFirst(params));
+            } else {
+                log.warn(String.format(message, params));
             }
-        } catch (Throwable t) {
-            warnLoggable = false;
         }
-        try {
-            if (errorLoggable == null) {
-                errorLoggable = android.util.Log.isLoggable(TAG, android.util.Log.ERROR);
+    }
+
+    public void warn(String message, Throwable t, Object... params) {
+        if (isWarnEnabled()) {
+            log.warn(String.format(message, params), t);
+        }
+    }
+
+    public void error(String message, Object... params) {
+        if (isErrorEnabled()) {
+            if (params != null && params.length > 0 && params[0] instanceof Throwable) {
+                error(message, (Throwable) params[0], paramsWithoutFirst(params));
+            } else {
+                log.error(String.format(message, params));
             }
-        } catch (Throwable t) {
-            errorLoggable = false;
-        }
-
-        log = LogFactory.getLog(name);
-    }
-
-    // //////// TRACE //////////
-
-    public void trace(String tag, String msg, Throwable tr) {
-        if (Config.LOGD && verboseLoggable) {
-            android.util.Log.v(tag, msg, tr);
-        } else {
-            log.trace(msg, tr);
         }
     }
 
-    public void trace(String tag, String msg) {
-        if (Config.LOGD && verboseLoggable) {
-            android.util.Log.v(tag, msg);
-        } else {
-            log.trace(msg);
+    public void error(String message, Throwable t, Object... params) {
+        if (isErrorEnabled()) {
+            log.error(String.format(message, params), t);
         }
     }
 
-    public void trace(String msg, Throwable tr) {
-        trace(TAG, msg, tr);
-    }
-
-    public void trace(String msg) {
-        trace(TAG, msg);
-    }
-
-    // //////// DEBUG //////////
-
-    public void debug(String tag, String msg, Throwable tr) {
-        if (Config.LOGD && debugLoggable) {
-            android.util.Log.d(tag, msg, tr);
-        } else {
-            log.debug(msg, tr);
+    public void fatal(String message, Object... params) {
+        if (isFatalEnabled()) {
+            if (params != null && params.length > 0 && params[0] instanceof Throwable) {
+                fatal(message, (Throwable) params[0], paramsWithoutFirst(params));
+            } else {
+                log.fatal(String.format(message, params));
+            }
         }
     }
 
-    public void debug(String tag, String msg) {
-        if (Config.LOGD && debugLoggable) {
-            android.util.Log.d(tag, msg);
-        } else {
-            log.debug(msg);
+    public void fatal(String message, Throwable t, Object... params) {
+        if (isFatalEnabled()) {
+            log.fatal(String.format(message, params), t);
         }
     }
 
-    public void debug(String msg, Throwable tr) {
-        debug(TAG, msg, tr);
-    }
-
-    public void debug(String msg) {
-        debug(TAG, msg);
-    }
-
-    // //////// INFO //////////
-
-    public void info(String tag, String msg, Throwable tr) {
-        if (Config.LOGD && infoLoggable) {
-            android.util.Log.i(tag, msg, tr);
-        } else {
-            log.info(msg, tr);
+    private static Object[] paramsWithoutFirst(Object... params) {
+        Object[] newParams = new Object[params.length - 1];
+        if (newParams.length > 0) {
+            System.arraycopy(params, 1, newParams, 0, newParams.length);
         }
+        return newParams;
     }
 
-    public void info(String tag, String msg) {
-        if (Config.LOGD && infoLoggable) {
-            android.util.Log.i(tag, msg);
-        } else {
-            log.info(msg);
-        }
-    }
-
-    public void info(String msg, Throwable tr) {
-        info(TAG, msg, tr);
-    }
-
-    public void info(String msg) {
-        info(TAG, msg);
-    }
-
-    // //////// WARN //////////
-
-    public void warn(String tag, String msg, Throwable tr) {
-        if (Config.LOGD && warnLoggable) {
-            android.util.Log.w(tag, msg, tr);
-        } else {
-            log.warn(msg, tr);
-        }
-    }
-
-    public void warn(String tag, String msg) {
-        if (Config.LOGD && warnLoggable) {
-            android.util.Log.w(tag, msg);
-        } else {
-            log.warn(msg);
-        }
-    }
-
-    public void warn(String msg, Throwable tr) {
-        warn(TAG, msg, tr);
-    }
-
-    public void warn(String msg) {
-        warn(TAG, msg);
-    }
-
-    // //////// ERROR //////////
-
-    public void error(String tag, String msg, Throwable tr) {
-        if (Config.LOGD && errorLoggable) {
-            android.util.Log.e(tag, msg, tr);
-        } else {
-            log.error(msg, tr);
-        }
-    }
-
-    public void error(String tag, String msg) {
-        if (Config.LOGD && errorLoggable) {
-            android.util.Log.e(tag, msg);
-        } else {
-            log.error(msg);
-        }
-    }
-
-    public void error(String msg, Throwable tr) {
-        error(TAG, msg, tr);
-    }
-
-    public void error(String msg) {
-        error(TAG, msg);
-    }
 }
