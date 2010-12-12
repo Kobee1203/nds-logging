@@ -1,23 +1,23 @@
 package org.nds.logging.test;
 
+import org.junit.Test;
 import org.nds.logging.Logger;
 import org.nds.logging.LoggerFactory;
 
-import android.test.AndroidTestCase;
-import android.util.Log;
+public class LoggingTest {
 
-public class LoggingTest extends AndroidTestCase {
-
+    /**
+     * This log uses /common-logging.properties and /simplelog.properties
+     */
     private static final Logger log = LoggerFactory.getLogger(LoggingTest.class);
 
-    public void testLogger() throws InterruptedException {
+    @Test
+    public void testLogger() {
+        System.out.println(LoggingTest.class.getClassLoader());
         log.trace("test log trace/verbose");
         log.debug("test log debug");
-        log.info("TAG_INFO", "test log info with tag TAG_INFO.");
+        log.info("test log info.");
         log.warn("test log warning");
         log.error("test log error");
-        Log.println(0, "TOTO", "test println");
-        System.out.println("test System out println");
     }
-
 }
