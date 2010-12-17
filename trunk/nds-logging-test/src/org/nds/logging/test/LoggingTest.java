@@ -13,7 +13,6 @@ public class LoggingTest {
 
     @Test
     public void testLogger() {
-        System.out.println(LoggingTest.class.getClassLoader());
         log.trace("test log trace/verbose");
         log.debug("test log debug");
         log.info("test log info.");

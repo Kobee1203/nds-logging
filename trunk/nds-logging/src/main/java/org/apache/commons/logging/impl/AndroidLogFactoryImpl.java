@@ -13,6 +13,7 @@ import java.util.Vector;
 import org.apache.commons.logging.AndroidLogFactory;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogConfigurationException;
+import org.apache.commons.logging.LogFactory;
 
 /**
  * <p>
@@ -22,9 +23,7 @@ import org.apache.commons.logging.LogConfigurationException;
  * <ul>
  * <li>Use a factory configuration attribute named <code>org.apache.commons.logging.Log</code> to identify the requested implementation class.</li>
  * <li>Use the <code>org.apache.commons.logging.Log</code> system property to identify the requested implementation class.</li>
- * <li>If <em>Log4J</em> is available, return an instance of <code>org.apache.commons.logging.impl.Log4JLogger</code>.</li>
- * <li>If <em>JDK 1.4 or later</em> is available, return an instance of <code>org.apache.commons.logging.impl.Jdk14Logger</code>.</li>
- * <li>Otherwise, return an instance of <code>org.apache.commons.logging.impl.SimpleLog</code>.</li>
+ * <li>Return an instance of <code>org.apache.commons.logging.impl.AndroidLog</code>.</li>
  * </ul>
  * 
  * <p>
@@ -43,13 +42,7 @@ import org.apache.commons.logging.LogConfigurationException;
 
 public class AndroidLogFactoryImpl extends AndroidLogFactory {
 
-    /** Log4JLogger class name */
-    private static final String LOGGING_IMPL_LOG4J_LOGGER = "org.apache.commons.logging.impl.Log4JLogger";
-    /** Jdk14Logger class name */
-    private static final String LOGGING_IMPL_JDK14_LOGGER = "org.apache.commons.logging.impl.Jdk14Logger";
-    /** Jdk13LumberjackLogger class name */
-    private static final String LOGGING_IMPL_LUMBERJACK_LOGGER = "org.apache.commons.logging.impl.Jdk13LumberjackLogger";
-    /** SimpleLog class name */
+    /** AndroidLog class name */
     private static final String LOGGING_IMPL_SIMPLE_LOGGER = "org.apache.commons.logging.impl.AndroidLog";
 
     private static final String PKG_IMPL = "org.apache.commons.logging.impl.";
@@ -120,8 +113,7 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
      * NoClassDefFound or ExceptionInInitializerError when loaded if the underlying logging library is not available. Any other error indicates that
      * the underlying logging library is available but broken/unusable for some reason.
      */
-    private static final String[] classesToDiscover = { LOGGING_IMPL_LOG4J_LOGGER, "org.apache.commons.logging.impl.Jdk14Logger",
-            "org.apache.commons.logging.impl.Jdk13LumberjackLogger", "org.apache.commons.logging.impl.SimpleLog" };
+    private static final String[] classesToDiscover = { "org.apache.commons.logging.impl.AndroidLog" };
 
     // ----------------------------------------------------- Instance Variables
 
@@ -261,7 +253,6 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
 
         Log instance = (Log) instances.get(name);
         if (instance == null) {
-        	System.out.println("AndroidLogFactoryImpl.getInstance(): " + name);
             instance = newInstance(name);
             instances.put(name, instance);
         }
@@ -348,7 +339,7 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
      * @since 1.1
      */
     protected static ClassLoader getContextClassLoader() throws LogConfigurationException {
-        return AndroidLogFactory.getContextClassLoader();
+        return LogFactory.getContextClassLoader();
     }
 
     /**
@@ -416,80 +407,6 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
     }
 
     /**
-     * Return the fully qualified Java classname of the {@link Log} implementation we will be using.
-     * 
-     * @deprecated Never invoked by this class; subclasses should not assume it will be.
-     */
-    @Deprecated
-    protected String getLogClassName() {
-
-        if (logClassName == null) {
-            discoverLogImplementation(getClass().getName());
-        }
-
-        return logClassName;
-    }
-
-    /**
-     * <p>
-     * Return the <code>Constructor</code> that can be called to instantiate new {@link org.apache.commons.logging.Log} instances.
-     * </p>
-     * 
-     * <p>
-     * <strong>IMPLEMENTATION NOTE</strong> - Race conditions caused by calling this method from more than one thread are ignored, because the same
-     * <code>Constructor</code> instance will ultimately be derived in all circumstances.
-     * </p>
-     * 
-     * @exception LogConfigurationException
-     *                if a suitable constructor cannot be returned
-     * 
-     * @deprecated Never invoked by this class; subclasses should not assume it will be.
-     */
-    @Deprecated
-    protected Constructor getLogConstructor() throws LogConfigurationException {
-
-        // Return the previously identified Constructor (if any)
-        if (logConstructor == null) {
-            discoverLogImplementation(getClass().getName());
-        }
-
-        return logConstructor;
-    }
-
-    /**
-     * Is <em>JDK 1.3 with Lumberjack</em> logging available?
-     * 
-     * @deprecated Never invoked by this class; subclasses should not assume it will be.
-     */
-    @Deprecated
-    protected boolean isJdk13LumberjackAvailable() {
-        return isLogLibraryAvailable("Jdk13Lumberjack", "org.apache.commons.logging.impl.Jdk13LumberjackLogger");
-    }
-
-    /**
-     * <p>
-     * Return <code>true</code> if <em>JDK 1.4 or later</em> logging is available. Also checks that the <code>Throwable</code> class supports
-     * <code>getStackTrace()</code>, which is required by Jdk14Logger.
-     * </p>
-     * 
-     * @deprecated Never invoked by this class; subclasses should not assume it will be.
-     */
-    @Deprecated
-    protected boolean isJdk14Available() {
-        return isLogLibraryAvailable("Jdk14", "org.apache.commons.logging.impl.Jdk14Logger");
-    }
-
-    /**
-     * Is a <em>Log4J</em> implementation available?
-     * 
-     * @deprecated Never invoked by this class; subclasses should not assume it will be.
-     */
-    @Deprecated
-    protected boolean isLog4JAvailable() {
-        return isLogLibraryAvailable("Log4J", LOGGING_IMPL_LOG4J_LOGGER);
-    }
-
-    /**
      * Create and return a new {@link org.apache.commons.logging.Log} instance for the specified name.
      * 
      * @param name
@@ -505,8 +422,7 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
             if (logConstructor == null) {
                 instance = discoverLogImplementation(name);
             } else {
-            	System.out.println("AndroidLogFactory.newInstance(params): " + name);
-            	Object params[] = { name };
+                Object params[] = { name };
                 instance = (Log) logConstructor.newInstance(params);
             }
 
@@ -558,7 +474,7 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
     private static ClassLoader getContextClassLoaderInternal() throws LogConfigurationException {
         return (ClassLoader) AccessController.doPrivileged(new PrivilegedAction() {
             public Object run() {
-                return AndroidLogFactory.directGetContextClassLoader();
+                return LogFactory.directGetContextClassLoader();
             }
         });
     }
@@ -597,37 +513,6 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
             return null;
         }
 
-    }
-
-    /**
-     * Utility method to check whether a particular logging library is present and available for use. Note that this does <i>not</i> affect the future
-     * behaviour of this class.
-     */
-    private boolean isLogLibraryAvailable(String name, String classname) {
-        if (isDiagnosticsEnabled()) {
-            logDiagnostic("Checking for '" + name + "'.");
-        }
-        try {
-            Log log = createLogFromClass(classname, this.getClass().getName(), // dummy category
-                    false);
-
-            if (log == null) {
-                if (isDiagnosticsEnabled()) {
-                    logDiagnostic("Did not find '" + name + "'.");
-                }
-                return false;
-            } else {
-                if (isDiagnosticsEnabled()) {
-                    logDiagnostic("Found '" + name + "'.");
-                }
-                return true;
-            }
-        } catch (LogConfigurationException e) {
-            if (isDiagnosticsEnabled()) {
-                logDiagnostic("Logging system '" + name + "' is available but not useable.");
-            }
-            return false;
-        }
     }
 
     /**
@@ -741,9 +626,6 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
                 // Mistyping or misspelling names is a common fault.
                 // Construct a good error message, if we can
                 if (specifiedLogClassName != null) {
-                    informUponSimilarName(messageBuffer, specifiedLogClassName, LOGGING_IMPL_LOG4J_LOGGER);
-                    informUponSimilarName(messageBuffer, specifiedLogClassName, LOGGING_IMPL_JDK14_LOGGER);
-                    informUponSimilarName(messageBuffer, specifiedLogClassName, LOGGING_IMPL_LUMBERJACK_LOGGER);
                     informUponSimilarName(messageBuffer, specifiedLogClassName, LOGGING_IMPL_SIMPLE_LOGGER);
                 }
                 throw new LogConfigurationException(messageBuffer.toString());
@@ -751,34 +633,6 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
 
             return result;
         }
-
-        // No user specified log; try to discover what's on the classpath
-        //
-        // Note that we deliberately loop here over classesToDiscover and
-        // expect method createLogFromClass to loop over the possible source
-        // classloaders. The effect is:
-        //   for each discoverable log adapter
-        //      for each possible classloader
-        //          see if it works
-        //
-        // It appears reasonable at first glance to do the opposite: 
-        //   for each possible classloader
-        //     for each discoverable log adapter
-        //        see if it works
-        //
-        // The latter certainly has advantages for user-installable logging
-        // libraries such as log4j; in a webapp for example this code should
-        // first check whether the user has provided any of the possible
-        // logging libraries before looking in the parent classloader. 
-        // Unfortunately, however, Jdk14Logger will always work in jvm>=1.4,
-        // and SimpleLog will always work in any JVM. So the loop would never
-        // ever look for logging libraries in the parent classpath. Yet many
-        // users would expect that putting log4j there would cause it to be
-        // detected (and this is the historical JCL behaviour). So we go with
-        // the first approach. A user that has bundled a specific logging lib
-        // in a webapp should use a commons-logging.properties file or a
-        // service file in META-INF to force use of that logging lib anyway,
-        // rather than relying on discovery.
 
         if (isDiagnosticsEnabled()) {
             logDiagnostic("No user-specified Log implementation; performing discovery" + " using the standard supported logging implementations...");
@@ -960,9 +814,7 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
                 }
 
                 constructor = c.getConstructor(logConstructorSignature);
-                System.out.println("AndroidLogFactory.createLogFromClass(): " + constructor);
                 Object o = constructor.newInstance(params);
-                System.out.println("AndroidLogFactory.createLogFromClass()[o]: " + o);
 
                 // Note that we do this test after trying to create an instance
                 // [rather than testing Log.class.isAssignableFrom(c)] so that
