@@ -261,6 +261,7 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
 
         Log instance = (Log) instances.get(name);
         if (instance == null) {
+        	System.out.println("AndroidLogFactoryImpl.getInstance(): " + name);
             instance = newInstance(name);
             instances.put(name, instance);
         }
@@ -504,7 +505,8 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
             if (logConstructor == null) {
                 instance = discoverLogImplementation(name);
             } else {
-                Object params[] = { name };
+            	System.out.println("AndroidLogFactory.newInstance(params): " + name);
+            	Object params[] = { name };
                 instance = (Log) logConstructor.newInstance(params);
             }
 
@@ -958,7 +960,9 @@ public class AndroidLogFactoryImpl extends AndroidLogFactory {
                 }
 
                 constructor = c.getConstructor(logConstructorSignature);
+                System.out.println("AndroidLogFactory.createLogFromClass(): " + constructor);
                 Object o = constructor.newInstance(params);
+                System.out.println("AndroidLogFactory.createLogFromClass()[o]: " + o);
 
                 // Note that we do this test after trying to create an instance
                 // [rather than testing Log.class.isAssignableFrom(c)] so that

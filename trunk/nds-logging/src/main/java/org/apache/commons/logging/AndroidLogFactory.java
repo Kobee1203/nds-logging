@@ -599,6 +599,7 @@ public abstract class AndroidLogFactory extends LogFactory {
      *                if a suitable <code>Log</code> instance cannot be returned
      */
     public static Log getLog(String name) throws LogConfigurationException {
+    	System.out.println("AndroidLogFactory.getLog(): " + name);
         return (getFactory().getInstance(name));
     }
 

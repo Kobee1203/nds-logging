@@ -31,7 +31,7 @@ public class AndroidLoggingTest extends AndroidTestCase {
 
     public void testLogger() throws InterruptedException {
         System.out.println(AndroidLoggingTest.class.getClassLoader());
-        getConfigurationFile(AndroidLoggingTest.class.getClassLoader(), "commons-logging.properties");
+        /*getConfigurationFile(AndroidLoggingTest.class.getClassLoader(), "commons-logging.properties");
         Properties props = getConfigurationFile(AndroidLoggingTest.class.getClassLoader(), "simplelog.properties");
         InputStream in = getResourceAsStream("simplelog.properties");
         in = getContextClassLoader().getResourceAsStream("/simplelog.properties");
@@ -42,7 +42,7 @@ public class AndroidLoggingTest extends AndroidTestCase {
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-        }
+        }*/
         log.trace("test log trace/verbose");
         log.debug("test log debug");
         log.info("test log info.");
