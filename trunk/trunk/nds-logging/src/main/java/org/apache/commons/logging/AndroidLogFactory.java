@@ -17,14 +17,10 @@
 
 package org.apache.commons.logging;
 
-import java.io.BufferedReader;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.PrintStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -359,28 +355,25 @@ public abstract class AndroidLogFactory extends LogFactory {
      *                if the implementation class is not available or cannot be instantiated.
      */
     public static AndroidLogFactory getFactory() throws LogConfigurationException {
-        // Identify the class loader we will be using
-        ClassLoader contextClassLoader = getContextClassLoaderInternal();
-
-        if (contextClassLoader == null) {
+        if (thisClassLoader == null) {
             // This is an odd enough situation to report about. This
             // output will be a nuisance on JDK1.1, as the system
             // classloader is null in that environment.
             if (isDiagnosticsEnabled()) {
-                logDiagnostic("Context classloader is null.");
+                logDiagnostic("Classloader is null.");
             }
         }
 
         // Return any previously registered factory for this class loader
-        AndroidLogFactory factory = getCachedFactory(contextClassLoader);
+        AndroidLogFactory factory = getCachedFactory(thisClassLoader);
         if (factory != null) {
             return factory;
         }
 
         if (isDiagnosticsEnabled()) {
             logDiagnostic("[LOOKUP] AndroidLogFactory implementation requested for the first time for context classloader "
-                    + objectId(contextClassLoader));
-            logHierarchy("[LOOKUP] ", contextClassLoader);
+                    + objectId(thisClassLoader));
+            logHierarchy("[LOOKUP] ", thisClassLoader);
         }
 
         // Load properties file.
@@ -392,29 +385,7 @@ public abstract class AndroidLogFactory extends LogFactory {
         //
         // As the properties file (if it exists) will be used one way or 
         // another in the end we may as well look for it first.
-        System.out.println("Configuration File: " + FACTORY_PROPERTIES);
-        Properties props = getConfigurationFile(contextClassLoader, FACTORY_PROPERTIES);
-
-        // Determine whether we will be using the thread context class loader to
-        // load logging classes or not by checking the loaded properties file (if any).
-        ClassLoader baseClassLoader = contextClassLoader;
-        if (props != null) {
-            String useTCCLStr = props.getProperty(TCCL_KEY);
-            if (useTCCLStr != null) {
-                // The Boolean.valueOf(useTCCLStr).booleanValue() formulation
-                // is required for Java 1.2 compatability.
-                if (Boolean.valueOf(useTCCLStr).booleanValue() == false) {
-                    // Don't use current context classloader when locating any
-                    // AndroidLogFactory or Log classes, just use the class that loaded
-                    // this abstract class. When this class is deployed in a shared
-                    // classpath of a container, it means webapps cannot deploy their
-                    // own logging implementations. It also means that it is up to the
-                    // implementation whether to load library-specific config files
-                    // from the TCCL or not.
-                    baseClassLoader = thisClassLoader;
-                }
-            }
-        }
+        Properties props = getConfigurationFile(thisClassLoader, FACTORY_PROPERTIES);
 
         // Determine which concrete AndroidLogFactory subclass to use.
         // First, try a global system property
@@ -430,7 +401,7 @@ public abstract class AndroidLogFactory extends LogFactory {
                             + FACTORY_PROPERTY);
                 }
 
-                factory = newFactory(factoryClass, baseClassLoader, contextClassLoader);
+                factory = newFactory(factoryClass, thisClassLoader);
             } else {
                 if (isDiagnosticsEnabled()) {
                     logDiagnostic("[LOOKUP] No system property [" + FACTORY_PROPERTY + "] defined.");
@@ -455,58 +426,7 @@ public abstract class AndroidLogFactory extends LogFactory {
             throw e;
         }
 
-        // Second, try to find a service by using the JDK1.3 class
-        // discovery mechanism, which involves putting a file with the name
-        // of an interface class in the META-INF/services directory, where the
-        // contents of the file is a single line specifying a concrete class 
-        // that implements the desired interface.
-
-        if (factory == null) {
-            if (isDiagnosticsEnabled()) {
-                logDiagnostic("[LOOKUP] Looking for a resource file of name [" + SERVICE_ID + "] to define the AndroidLogFactory subclass to use...");
-            }
-            try {
-                InputStream is = getResourceAsStream(contextClassLoader, SERVICE_ID);
-
-                if (is != null) {
-                    // This code is needed by EBCDIC and other strange systems.
-                    // It's a fix for bugs reported in xerces
-                    BufferedReader rd;
-                    try {
-                        rd = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-                    } catch (java.io.UnsupportedEncodingException e) {
-                        rd = new BufferedReader(new InputStreamReader(is));
-                    }
-
-                    String factoryClassName = rd.readLine();
-                    rd.close();
-
-                    if (factoryClassName != null && !"".equals(factoryClassName)) {
-                        if (isDiagnosticsEnabled()) {
-                            logDiagnostic("[LOOKUP]  Creating an instance of AndroidLogFactory class " + factoryClassName + " as specified by file '"
-                                    + SERVICE_ID + "' which was present in the path of the context" + " classloader.");
-                        }
-                        factory = newFactory(factoryClassName, baseClassLoader, contextClassLoader);
-                    }
-                } else {
-                    // is == null
-                    if (isDiagnosticsEnabled()) {
-                        logDiagnostic("[LOOKUP] No resource file with name '" + SERVICE_ID + "' found.");
-                    }
-                }
-            } catch (Exception ex) {
-                // note: if the specified AndroidLogFactory class wasn't compatible with AndroidLogFactory
-                // for some reason, a ClassCastException will be caught here, and attempts will
-                // continue to find a compatible class.
-                if (isDiagnosticsEnabled()) {
-                    logDiagnostic("[LOOKUP] A security exception occurred while trying to create an" + " instance of the custom factory class"
-                            + ": [" + trim(ex.getMessage()) + "]. Trying alternative implementations...");
-                }
-                ; // ignore
-            }
-        }
-
-        // Third try looking into the properties file read earlier (if found)
+        // Try looking into the properties file read earlier (if found)
 
         if (factory == null) {
             if (props != null) {
@@ -519,8 +439,7 @@ public abstract class AndroidLogFactory extends LogFactory {
                     if (isDiagnosticsEnabled()) {
                         logDiagnostic("[LOOKUP] Properties file specifies AndroidLogFactory subclass '" + factoryClass + "'");
                     }
-                    factory = newFactory(factoryClass, baseClassLoader, contextClassLoader);
-
+                    factory = newFactory(factoryClass, thisClassLoader);
                     // TODO: think about whether we need to handle exceptions from newFactory
                 } else {
                     if (isDiagnosticsEnabled()) {
@@ -534,7 +453,7 @@ public abstract class AndroidLogFactory extends LogFactory {
             }
         }
 
-        // Fourth, try the fallback implementation class
+        // Try the fallback implementation class
 
         if (factory == null) {
             if (isDiagnosticsEnabled()) {
@@ -551,14 +470,14 @@ public abstract class AndroidLogFactory extends LogFactory {
             // version of the AndroidLogFactoryImpl class and have it used dynamically
             // by an old AndroidLogFactory class in the parent, but that isn't 
             // necessarily a good idea anyway.
-            factory = newFactory(FACTORY_DEFAULT, thisClassLoader, contextClassLoader);
+            factory = newFactory(FACTORY_DEFAULT, thisClassLoader);
         }
 
         if (factory != null) {
             /**
              * Always cache using context class loader.
              */
-            cacheFactory(contextClassLoader, factory);
+            cacheFactory(thisClassLoader, factory);
 
             if (props != null) {
                 Enumeration names = props.propertyNames();
@@ -599,7 +518,6 @@ public abstract class AndroidLogFactory extends LogFactory {
      *                if a suitable <code>Log</code> instance cannot be returned
      */
     public static Log getLog(String name) throws LogConfigurationException {
-    	System.out.println("AndroidLogFactory.getLog(): " + name);
         return (getFactory().getInstance(name));
     }
 
@@ -690,118 +608,6 @@ public abstract class AndroidLogFactory extends LogFactory {
     }
 
     /**
-     * Returns the current context classloader.
-     * <p>
-     * In versions prior to 1.1, this method did not use an AccessController. In version 1.1, an AccessController wrapper was incorrectly added to
-     * this method, causing a minor security flaw.
-     * <p>
-     * In version 1.1.1 this change was reverted; this method no longer uses an AccessController. User code wishing to obtain the context classloader
-     * must invoke this method via AccessController.doPrivileged if it needs support for that.
-     * 
-     * @return the context classloader associated with the current thread, or null if security doesn't allow it.
-     * 
-     * @throws LogConfigurationException
-     *             if there was some weird error while attempting to get the context classloader.
-     * 
-     * @throws SecurityException
-     *             if the current java security policy doesn't allow this class to access the context classloader.
-     */
-    protected static ClassLoader getContextClassLoader() throws LogConfigurationException {
-
-        return directGetContextClassLoader();
-    }
-
-    /**
-     * Calls AndroidLogFactory.directGetContextClassLoader under the control of an AccessController class. This means that java code running under a
-     * security manager that forbids access to ClassLoaders will still work if this class is given appropriate privileges, even when the caller
-     * doesn't have such privileges. Without using an AccessController, the the entire call stack must have the privilege before the call is allowed.
-     * 
-     * @return the context classloader associated with the current thread, or null if security doesn't allow it.
-     * 
-     * @throws LogConfigurationException
-     *             if there was some weird error while attempting to get the context classloader.
-     * 
-     * @throws SecurityException
-     *             if the current java security policy doesn't allow this class to access the context classloader.
-     */
-    private static ClassLoader getContextClassLoaderInternal() throws LogConfigurationException {
-        return (ClassLoader) AccessController.doPrivileged(new PrivilegedAction() {
-            public Object run() {
-                return directGetContextClassLoader();
-            }
-        });
-    }
-
-    /**
-     * Return the thread context class loader if available; otherwise return null.
-     * <p>
-     * Most/all code should call getContextClassLoaderInternal rather than calling this method directly.
-     * <p>
-     * The thread context class loader is available for JDK 1.2 or later, if certain security conditions are met.
-     * <p>
-     * Note that no internal logging is done within this method because this method is called every time AndroidLogFactory.getLogger() is called, and
-     * we don't want too much output generated here.
-     * 
-     * @exception LogConfigurationException
-     *                if a suitable class loader cannot be identified.
-     * 
-     * @exception SecurityException
-     *                if the java security policy forbids access to the context classloader from one of the classes in the current call stack.
-     * @since 1.1
-     */
-    protected static ClassLoader directGetContextClassLoader() throws LogConfigurationException {
-        ClassLoader classLoader = null;
-
-        try {
-            // Are we running on a JDK 1.2 or later system?
-            Method method = Thread.class.getMethod("getContextClassLoader", (Class[]) null);
-
-            // Get the thread context class loader (if there is one)
-            try {
-                classLoader = (ClassLoader) method.invoke(Thread.currentThread(), (Object[]) null);
-            } catch (IllegalAccessException e) {
-                throw new LogConfigurationException("Unexpected IllegalAccessException", e);
-            } catch (InvocationTargetException e) {
-                /**
-                 * InvocationTargetException is thrown by 'invoke' when the method being invoked (getContextClassLoader) throws an exception.
-                 * 
-                 * getContextClassLoader() throws SecurityException when the context class loader isn't an ancestor of the calling class's class
-                 * loader, or if security permissions are restricted.
-                 * 
-                 * In the first case (not related), we want to ignore and keep going. We cannot help but also ignore the second with the logic below,
-                 * but other calls elsewhere (to obtain a class loader) will trigger this exception where we can make a distinction.
-                 */
-                if (e.getTargetException() instanceof SecurityException) {
-                    ; // ignore
-                } else {
-                    // Capture 'e.getTargetException()' exception for details
-                    // alternate: log 'e.getTargetException()', and pass back 'e'.
-                    throw new LogConfigurationException("Unexpected InvocationTargetException", e.getTargetException());
-                }
-            }
-        } catch (NoSuchMethodException e) {
-            // Assume we are running on JDK 1.1
-            classLoader = getClassLoader(AndroidLogFactory.class);
-
-            // We deliberately don't log a message here to outputStream;
-            // this message would be output for every call to AndroidLogFactory.getLog()
-            // when running on JDK1.1
-            //
-            // if (outputStream != null) {
-            //    outputStream.println(
-            //        "Method Thread.getContextClassLoader does not exist;"
-            //         + " assuming this is JDK 1.1, and that the context"
-            //         + " classloader is the same as the class that loaded"
-            //         + " the concrete AndroidLogFactory class.");
-            // }
-
-        }
-
-        // Return the selected class loader
-        return classLoader;
-    }
-
-    /**
      * Check cached factories (keyed by contextClassLoader)
      * 
      * @param contextClassLoader
@@ -886,7 +692,7 @@ public abstract class AndroidLogFactory extends LogFactory {
      *                if a suitable instance cannot be created
      * @since 1.1
      */
-    protected static AndroidLogFactory newFactory(final String factoryClass, final ClassLoader classLoader, final ClassLoader contextClassLoader) throws LogConfigurationException {
+    protected static AndroidLogFactory newFactory(final String factoryClass, final ClassLoader classLoader) throws LogConfigurationException {
         // Note that any unchecked exceptions thrown by the createFactory
         // method will propagate out of this method; in particular a
         // ClassCastException can be thrown.
@@ -904,22 +710,9 @@ public abstract class AndroidLogFactory extends LogFactory {
             throw ex;
         }
         if (isDiagnosticsEnabled()) {
-            logDiagnostic("Created object " + objectId(result) + " to manage classloader " + objectId(contextClassLoader));
+            logDiagnostic("Created object " + objectId(result) + " to manage classloader " + objectId(classLoader));
         }
         return (AndroidLogFactory) result;
-    }
-
-    /**
-     * Method provided for backwards compatibility; see newFactory version that takes 3 parameters.
-     * <p>
-     * This method would only ever be called in some rather odd situation. Note that this method is static, so overriding in a subclass doesn't have
-     * any effect unless this method is called from a method in that subclass. However this method only makes sense to use from the getFactory method,
-     * and as that is almost always invoked via AndroidLogFactory.getFactory, any custom definition in a subclass would be pointless. Only a class
-     * with a custom getFactory method, then invoked directly via CustomFactoryImpl.getFactory or similar would ever call this. Anyway, it's here just
-     * in case, though the "managed class loader" value output to the diagnostics will not report the correct value.
-     */
-    protected static AndroidLogFactory newFactory(final String factoryClass, final ClassLoader classLoader) {
-        return newFactory(factoryClass, classLoader, null);
     }
 
     /**

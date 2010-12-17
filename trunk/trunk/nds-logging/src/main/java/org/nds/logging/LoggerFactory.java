@@ -30,7 +30,6 @@ public class LoggerFactory {
 
     private LoggerFactory() {
         if (android.os.Build.ID != null) {
-            System.out.println("ID: " + android.os.Build.ID);
             androidLoggable = true;
         }
     }
@@ -45,7 +44,6 @@ public class LoggerFactory {
     public final static Logger getLogger(String name) {
         Logger logger = getInstance().instances.get(name);
         if (logger == null) {
-            System.out.println("Android Loggable: " + androidLoggable);
             if (androidLoggable) {
                 logger = new Logger(name, AndroidLogFactory.getLog(name));
             } else {
