@@ -1,12 +1,15 @@
 package org.apache.commons.logging.impl;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.Properties;
 
 import org.apache.commons.logging.LogConfigurationException;
@@ -56,6 +59,27 @@ public class AndroidLog extends SimpleLog {
 
     public AndroidLog(String name) {
         super(name);
+        
+     // Identify the class loader we will be using
+        ClassLoader contextClassLoader = getContextClassLoaderInternal();
+        // Add props from the resource androidlog.properties
+        androidLogProps.putAll(getConfigurationFile(contextClassLoader, "androidlog.properties"));
+        System.out.println("androidLogProps: " + androidLogProps);
+        
+        showLogName = getBooleanProperty(systemPrefix + "showlogname", showLogName);
+        showShortName = getBooleanProperty(systemPrefix + "showShortLogname", showShortName);
+        showDateTime = getBooleanProperty(systemPrefix + "showdatetime", showDateTime);
+
+        if (showDateTime) {
+            dateTimeFormat = getStringProperty(systemPrefix + "dateTimeFormat", dateTimeFormat);
+            try {
+                dateFormatter = new SimpleDateFormat(dateTimeFormat);
+            } catch (IllegalArgumentException e) {
+                // If the format pattern is invalid - use the default format
+                dateTimeFormat = DEFAULT_DATE_TIME_FORMAT;
+                dateFormatter = new SimpleDateFormat(dateTimeFormat);
+            }
+        }
     }
 
     // ------------------------------------------------------------ Initializer
@@ -84,17 +108,12 @@ public class AndroidLog extends SimpleLog {
     // Load properties file, if found.
     // Override with system properties.
     static {
+    	// Identify the class loader we will be using
+        ClassLoader contextClassLoader = getContextClassLoaderInternal();
         // Add props from the resource androidlog.properties
-        InputStream in = getResourceAsStream("androidlog.properties");
-        if (null != in) {
-            try {
-                androidLogProps.load(in);
-                in.close();
-            } catch (java.io.IOException e) {
-                // ignored
-            }
-        }
-
+        androidLogProps.putAll(getConfigurationFile(contextClassLoader, "androidlog.properties"));
+        System.out.println("androidLogProps: " + androidLogProps);
+        
         showLogName = getBooleanProperty(systemPrefix + "showlogname", showLogName);
         showShortName = getBooleanProperty(systemPrefix + "showShortLogname", showShortName);
         showDateTime = getBooleanProperty(systemPrefix + "showdatetime", showDateTime);
@@ -111,6 +130,34 @@ public class AndroidLog extends SimpleLog {
         }
     }
 
+    /**
+     * Calls LogFactory.directGetContextClassLoader under the control of an
+     * AccessController class. This means that java code running under a
+     * security manager that forbids access to ClassLoaders will still work
+     * if this class is given appropriate privileges, even when the caller
+     * doesn't have such privileges. Without using an AccessController, the
+     * the entire call stack must have the privilege before the call is
+     * allowed.
+     *  
+     * @return the context classloader associated with the current thread,
+     * or null if security doesn't allow it.
+     * 
+     * @throws LogConfigurationException if there was some weird error while
+     * attempting to get the context classloader.
+     * 
+     * @throws SecurityException if the current java security policy doesn't
+     * allow this class to access the context classloader.
+     */
+    private static ClassLoader getContextClassLoaderInternal()
+    throws LogConfigurationException {
+        return (ClassLoader)AccessController.doPrivileged(
+            new PrivilegedAction() {
+                public Object run() {
+                    return getContextClassLoader();
+                }
+            });
+    }
+    
     /**
      * Return the thread context class loader if available. Otherwise return null.
      * 
@@ -163,19 +210,111 @@ public class AndroidLog extends SimpleLog {
         // Return the selected class loader
         return classLoader;
     }
-
-    private static InputStream getResourceAsStream(final String name) {
-        return (InputStream) AccessController.doPrivileged(new PrivilegedAction() {
+    
+    private static Properties getProperties(final URL url) {
+        PrivilegedAction action = new PrivilegedAction() {
             public Object run() {
-                ClassLoader threadCL = getContextClassLoader();
+                try {
+                    InputStream stream = url.openStream();
+                    if (stream != null) {
+                        Properties props = new Properties();
+                        props.load(stream);
+                        stream.close();
+                        return props;
+                    }
+                } catch (IOException e) {
+                    System.err.println(e);
+                }
 
-                if (threadCL != null) {
-                    return threadCL.getResourceAsStream(name);
-                } else {
-                    return ClassLoader.getSystemResourceAsStream(name);
+                return null;
+            }
+        };
+        return (Properties) AccessController.doPrivileged(action);
+    }
+    
+    private static final Properties getConfigurationFile(ClassLoader classLoader, String fileName) {
+
+        Properties props = null;
+        double priority = 0.0;
+        URL propsUrl = null;
+        try {
+            Enumeration urls = getResources(classLoader, fileName);
+
+            if (urls == null) {
+                return null;
+            }
+
+            while (urls.hasMoreElements()) {
+                URL url = (URL) urls.nextElement();
+
+                Properties newProps = getProperties(url);
+                if (newProps != null) {
+                    if (props == null) {
+                        propsUrl = url;
+                        props = newProps;
+                        String priorityStr = props.getProperty("priority");
+                        priority = 0.0;
+                        if (priorityStr != null) {
+                            priority = Double.parseDouble(priorityStr);
+                        }
+
+                        System.err.println("[LOOKUP] Properties file found at '" + url + "'" + " with priority " + priority);
+                    } else {
+                        String newPriorityStr = newProps.getProperty("priority");
+                        double newPriority = 0.0;
+                        if (newPriorityStr != null) {
+                            newPriority = Double.parseDouble(newPriorityStr);
+                        }
+
+                        if (newPriority > priority) {
+                            System.err.println("[LOOKUP] Properties file at '" + url + "'" + " with priority " + newPriority + " overrides file at '"
+                                    + propsUrl + "'" + " with priority " + priority);
+
+                            propsUrl = url;
+                            props = newProps;
+                            priority = newPriority;
+                        } else {
+                            System.err.println("[LOOKUP] Properties file at '" + url + "'" + " with priority " + newPriority
+                                    + " does not override file at '" + propsUrl + "'" + " with priority " + priority);
+                        }
+                    }
                 }
             }
-        });
+        } catch (Exception e) {
+            System.err.println("SecurityException thrown while trying to find/read config files.");
+        }
+
+        if (props == null) {
+            System.err.println("[LOOKUP] No properties file of name '" + fileName + "' found.");
+        } else {
+            System.err.println("[LOOKUP] Properties file of name '" + fileName + "' found at '" + propsUrl + '"');
+        }
+
+        return props;
+    }
+
+    private static Enumeration getResources(final ClassLoader loader, final String name) {
+        PrivilegedAction action = new PrivilegedAction() {
+            public Object run() {
+                try {
+                    if (loader != null) {
+                        return loader.getResources(name);
+                    } else {
+                        return ClassLoader.getSystemResources(name);
+                    }
+                } catch (IOException e) {
+                    System.err.println("Exception while trying to find configuration file " + name + ":" + e.getMessage());
+                    return null;
+                } catch (NoSuchMethodError e) {
+                    // we must be running on a 1.1 JVM which doesn't support
+                    // ClassLoader.getSystemResources; just return null in
+                    // this case.
+                    return null;
+                }
+            }
+        };
+        Object result = AccessController.doPrivileged(action);
+        return (Enumeration) result;
     }
 
     /**
