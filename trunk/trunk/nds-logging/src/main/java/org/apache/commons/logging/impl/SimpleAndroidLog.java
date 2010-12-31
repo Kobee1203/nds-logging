@@ -29,6 +29,8 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.Properties;
 
+import org.apache.commons.logging.AndroidLog;
+
 import android.util.Log;
 
 /**
@@ -59,7 +61,7 @@ import android.util.Log;
  * 
  * @author Nicolas Dos Santos
  */
-public class AndroidLog implements org.apache.commons.logging.Log, Serializable {
+public class SimpleAndroidLog implements AndroidLog, Serializable {
 
     private static final long serialVersionUID = -7864001067995532343L;
 
@@ -146,9 +148,14 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
     // Override with system properties.
     static {
         // Identify the class loader we will be using
-        ClassLoader classLoader = getClassLoader(AndroidLog.class);
+        ClassLoader classLoader = getClassLoader(SimpleAndroidLog.class);
+        System.out.println("classLoader: " + classLoader);
         // Add props from the resource androidlog.properties
-        androidLogProps.putAll(getConfigurationFile(classLoader, "androidlog.properties"));
+        Properties props = getConfigurationFile(classLoader, "androidlog.properties");
+        if (props != null) {
+            androidLogProps.putAll(props);
+        }
+        System.out.println("Android Log Properties: " + androidLogProps);
 
         showLogName = getBooleanProperty(systemPrefix + "showlogname", showLogName);
         showShortName = getBooleanProperty(systemPrefix + "showShortLogname", showShortName);
@@ -188,13 +195,13 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @param name
      *            log name
      */
-    public AndroidLog(String name) {
+    public SimpleAndroidLog(String name) {
         logName = tag = name;
 
         // Set initial log level
         // Used to be: set default log level to ERROR
         // IMHO it should be lower, but at least info ( costin ).
-        setLevel(AndroidLog.LOG_LEVEL_INFO);
+        setLevel(SimpleAndroidLog.LOG_LEVEL_INFO);
 
         // Set log level from properties
         String lvl = getStringProperty(systemPrefix + "log." + logName);
@@ -210,27 +217,27 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
         }
 
         if ("all".equalsIgnoreCase(lvl)) {
-            setLevel(AndroidLog.LOG_LEVEL_ALL);
+            setLevel(SimpleAndroidLog.LOG_LEVEL_ALL);
         } else if ("trace".equalsIgnoreCase(lvl)) {
-            setLevel(AndroidLog.LOG_LEVEL_TRACE);
+            setLevel(SimpleAndroidLog.LOG_LEVEL_TRACE);
         } else if ("debug".equalsIgnoreCase(lvl)) {
-            setLevel(AndroidLog.LOG_LEVEL_DEBUG);
+            setLevel(SimpleAndroidLog.LOG_LEVEL_DEBUG);
         } else if ("info".equalsIgnoreCase(lvl)) {
-            setLevel(AndroidLog.LOG_LEVEL_INFO);
+            setLevel(SimpleAndroidLog.LOG_LEVEL_INFO);
         } else if ("warn".equalsIgnoreCase(lvl)) {
-            setLevel(AndroidLog.LOG_LEVEL_WARN);
+            setLevel(SimpleAndroidLog.LOG_LEVEL_WARN);
         } else if ("error".equalsIgnoreCase(lvl)) {
-            setLevel(AndroidLog.LOG_LEVEL_ERROR);
+            setLevel(SimpleAndroidLog.LOG_LEVEL_ERROR);
         } else if ("fatal".equalsIgnoreCase(lvl)) {
-            setLevel(AndroidLog.LOG_LEVEL_FATAL);
+            setLevel(SimpleAndroidLog.LOG_LEVEL_FATAL);
         } else if ("off".equalsIgnoreCase(lvl)) {
-            setLevel(AndroidLog.LOG_LEVEL_OFF);
+            setLevel(SimpleAndroidLog.LOG_LEVEL_OFF);
         }
     }
 
     // ------------------------------------------------------------ Initializer
 
-    protected static ClassLoader getClassLoader(Class clazz) {
+    protected static ClassLoader getClassLoader(Class<?> clazz) {
         try {
             return clazz.getClassLoader();
         } catch (SecurityException ex) {
@@ -240,8 +247,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
     }
 
     private static Properties getProperties(final URL url) {
-        PrivilegedAction action = new PrivilegedAction() {
-            public Object run() {
+        PrivilegedAction<Properties> action = new PrivilegedAction<Properties>() {
+            public Properties run() {
                 try {
                     InputStream stream = url.openStream();
                     if (stream != null) {
@@ -257,7 +264,7 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
                 return null;
             }
         };
-        return (Properties) AccessController.doPrivileged(action);
+        return AccessController.doPrivileged(action);
     }
 
     private static final Properties getConfigurationFile(ClassLoader classLoader, String fileName) {
@@ -265,14 +272,14 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
         double priority = 0.0;
         URL propsUrl = null;
         try {
-            Enumeration urls = getResources(classLoader, fileName);
+            Enumeration<URL> urls = getResources(classLoader, fileName);
 
             if (urls == null) {
                 return null;
             }
 
             while (urls.hasMoreElements()) {
-                URL url = (URL) urls.nextElement();
+                URL url = urls.nextElement();
                 Properties newProps = getProperties(url);
                 if (newProps != null) {
                     if (props == null) {
@@ -319,9 +326,9 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
         return props;
     }
 
-    private static Enumeration getResources(final ClassLoader loader, final String name) {
-        PrivilegedAction action = new PrivilegedAction() {
-            public Object run() {
+    private static Enumeration<URL> getResources(final ClassLoader loader, final String name) {
+        PrivilegedAction<Enumeration<URL>> action = new PrivilegedAction<Enumeration<URL>>() {
+            public Enumeration<URL> run() {
                 try {
                     if (loader != null) {
                         return loader.getResources(name);
@@ -339,8 +346,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
                 }
             }
         };
-        Object result = AccessController.doPrivileged(action);
-        return (Enumeration) result;
+
+        return AccessController.doPrivileged(action);
     }
 
     // -------------------------------------------------------- Properties
@@ -354,7 +361,6 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      *            new logging level
      */
     public void setLevel(int currentLogLevel) {
-
         this.currentLogLevel = currentLogLevel;
 
     }
@@ -365,7 +371,6 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * </p>
      */
     public int getLevel() {
-
         return currentLogLevel;
     }
 
@@ -402,22 +407,22 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
         // Append a readable representation of the log level
         if (showLevel) {
             switch (type) {
-                case AndroidLog.LOG_LEVEL_TRACE:
+                case SimpleAndroidLog.LOG_LEVEL_TRACE:
                     buf.append("[TRACE] ");
                     break;
-                case AndroidLog.LOG_LEVEL_DEBUG:
+                case SimpleAndroidLog.LOG_LEVEL_DEBUG:
                     buf.append("[DEBUG] ");
                     break;
-                case AndroidLog.LOG_LEVEL_INFO:
+                case SimpleAndroidLog.LOG_LEVEL_INFO:
                     buf.append("[INFO] ");
                     break;
-                case AndroidLog.LOG_LEVEL_WARN:
+                case SimpleAndroidLog.LOG_LEVEL_WARN:
                     buf.append("[WARN] ");
                     break;
-                case AndroidLog.LOG_LEVEL_ERROR:
+                case SimpleAndroidLog.LOG_LEVEL_ERROR:
                     buf.append("[ERROR] ");
                     break;
-                case AndroidLog.LOG_LEVEL_FATAL:
+                case SimpleAndroidLog.LOG_LEVEL_FATAL:
                     buf.append("[FATAL] ");
                     break;
             }
@@ -456,22 +461,22 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
         }
 
         switch (type) {
-            case AndroidLog.LOG_LEVEL_TRACE:
+            case SimpleAndroidLog.LOG_LEVEL_TRACE:
                 Log.v(tag, buf.toString());
                 break;
-            case AndroidLog.LOG_LEVEL_DEBUG:
+            case SimpleAndroidLog.LOG_LEVEL_DEBUG:
                 Log.d(tag, buf.toString());
                 break;
-            case AndroidLog.LOG_LEVEL_INFO:
+            case SimpleAndroidLog.LOG_LEVEL_INFO:
                 Log.i(tag, buf.toString());
                 break;
-            case AndroidLog.LOG_LEVEL_WARN:
+            case SimpleAndroidLog.LOG_LEVEL_WARN:
                 Log.w(tag, buf.toString());
                 break;
-            case AndroidLog.LOG_LEVEL_ERROR:
+            case SimpleAndroidLog.LOG_LEVEL_ERROR:
                 Log.e(tag, buf.toString());
                 break;
-            case AndroidLog.LOG_LEVEL_FATAL:
+            case SimpleAndroidLog.LOG_LEVEL_FATAL:
                 Log.e(tag, buf.toString());
                 break;
         }
@@ -520,9 +525,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#debug(Object)
      */
     public final void debug(Object message) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_DEBUG)) {
-            log(AndroidLog.LOG_LEVEL_DEBUG, message, null);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_DEBUG)) {
+            log(SimpleAndroidLog.LOG_LEVEL_DEBUG, message, null);
         }
     }
 
@@ -536,9 +540,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#debug(Object, Throwable)
      */
     public final void debug(Object message, Throwable t) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_DEBUG)) {
-            log(AndroidLog.LOG_LEVEL_DEBUG, message, t);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_DEBUG)) {
+            log(SimpleAndroidLog.LOG_LEVEL_DEBUG, message, t);
         }
     }
 
@@ -550,9 +553,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#trace(Object)
      */
     public final void trace(Object message) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_TRACE)) {
-            log(AndroidLog.LOG_LEVEL_TRACE, message, null);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_TRACE)) {
+            log(SimpleAndroidLog.LOG_LEVEL_TRACE, message, null);
         }
     }
 
@@ -566,9 +568,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#trace(Object, Throwable)
      */
     public final void trace(Object message, Throwable t) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_TRACE)) {
-            log(AndroidLog.LOG_LEVEL_TRACE, message, t);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_TRACE)) {
+            log(SimpleAndroidLog.LOG_LEVEL_TRACE, message, t);
         }
     }
 
@@ -580,9 +581,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#info(Object)
      */
     public final void info(Object message) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_INFO)) {
-            log(AndroidLog.LOG_LEVEL_INFO, message, null);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_INFO)) {
+            log(SimpleAndroidLog.LOG_LEVEL_INFO, message, null);
         }
     }
 
@@ -596,9 +596,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#info(Object, Throwable)
      */
     public final void info(Object message, Throwable t) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_INFO)) {
-            log(AndroidLog.LOG_LEVEL_INFO, message, t);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_INFO)) {
+            log(SimpleAndroidLog.LOG_LEVEL_INFO, message, t);
         }
     }
 
@@ -610,9 +609,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#warn(Object)
      */
     public final void warn(Object message) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_WARN)) {
-            log(AndroidLog.LOG_LEVEL_WARN, message, null);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_WARN)) {
+            log(SimpleAndroidLog.LOG_LEVEL_WARN, message, null);
         }
     }
 
@@ -626,9 +624,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#warn(Object, Throwable)
      */
     public final void warn(Object message, Throwable t) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_WARN)) {
-            log(AndroidLog.LOG_LEVEL_WARN, message, t);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_WARN)) {
+            log(SimpleAndroidLog.LOG_LEVEL_WARN, message, t);
         }
     }
 
@@ -640,9 +637,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#error(Object)
      */
     public final void error(Object message) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_ERROR)) {
-            log(AndroidLog.LOG_LEVEL_ERROR, message, null);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_ERROR)) {
+            log(SimpleAndroidLog.LOG_LEVEL_ERROR, message, null);
         }
     }
 
@@ -656,9 +652,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#error(Object, Throwable)
      */
     public final void error(Object message, Throwable t) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_ERROR)) {
-            log(AndroidLog.LOG_LEVEL_ERROR, message, t);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_ERROR)) {
+            log(SimpleAndroidLog.LOG_LEVEL_ERROR, message, t);
         }
     }
 
@@ -670,9 +665,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#fatal(Object)
      */
     public final void fatal(Object message) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_FATAL)) {
-            log(AndroidLog.LOG_LEVEL_FATAL, message, null);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_FATAL)) {
+            log(SimpleAndroidLog.LOG_LEVEL_FATAL, message, null);
         }
     }
 
@@ -686,9 +680,8 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * @see org.apache.commons.logging.Log#fatal(Object, Throwable)
      */
     public final void fatal(Object message, Throwable t) {
-
-        if (isLevelEnabled(AndroidLog.LOG_LEVEL_FATAL)) {
-            log(AndroidLog.LOG_LEVEL_FATAL, message, t);
+        if (isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_FATAL)) {
+            log(SimpleAndroidLog.LOG_LEVEL_FATAL, message, t);
         }
     }
 
@@ -702,8 +695,7 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * </p>
      */
     public final boolean isDebugEnabled() {
-
-        return isLevelEnabled(AndroidLog.LOG_LEVEL_DEBUG);
+        return isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_DEBUG);
     }
 
     /**
@@ -716,8 +708,7 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * </p>
      */
     public final boolean isErrorEnabled() {
-
-        return isLevelEnabled(AndroidLog.LOG_LEVEL_ERROR);
+        return isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_ERROR);
     }
 
     /**
@@ -730,8 +721,7 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * </p>
      */
     public final boolean isFatalEnabled() {
-
-        return isLevelEnabled(AndroidLog.LOG_LEVEL_FATAL);
+        return isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_FATAL);
     }
 
     /**
@@ -744,8 +734,7 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * </p>
      */
     public final boolean isInfoEnabled() {
-
-        return isLevelEnabled(AndroidLog.LOG_LEVEL_INFO);
+        return isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_INFO);
     }
 
     /**
@@ -758,8 +747,7 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * </p>
      */
     public final boolean isTraceEnabled() {
-
-        return isLevelEnabled(AndroidLog.LOG_LEVEL_TRACE);
+        return isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_TRACE);
     }
 
     /**
@@ -772,8 +760,7 @@ public class AndroidLog implements org.apache.commons.logging.Log, Serializable 
      * </p>
      */
     public final boolean isWarnEnabled() {
-
-        return isLevelEnabled(AndroidLog.LOG_LEVEL_WARN);
+        return isLevelEnabled(SimpleAndroidLog.LOG_LEVEL_WARN);
     }
 
 }

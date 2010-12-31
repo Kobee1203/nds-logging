@@ -90,12 +90,6 @@ public class Logger {
 
     protected Logger(String name, Log log) {
         this.log = log;
-
-        System.out.println("[" + name + "] trace enabled: " + log.isTraceEnabled());
-        System.out.println("[" + name + "] debug enabled: " + log.isDebugEnabled());
-        System.out.println("[" + name + "] info enabled: " + log.isInfoEnabled());
-        System.out.println("[" + name + "] warn enabled: " + log.isWarnEnabled());
-        System.out.println("[" + name + "] error enabled: " + log.isErrorEnabled());
     }
 
     public boolean isTraceEnabled() {

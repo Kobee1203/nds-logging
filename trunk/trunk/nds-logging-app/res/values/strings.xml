@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="hello">Hello World, DbDroidSQLite!</string>
+    <string name="hello">NDS Logging - check your logs to verify if there is: \n
+    - org.nds.logging.LoggingApp: LoggingApp - LoggingApp#onCreate()\n
+    - org.nds.logging.LoggingApp: LoggingApp - Activity initialized.
+    </string>
     <string name="app_name">dbdroid-sqlite</string>
 </resources>
