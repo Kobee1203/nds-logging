@@ -25,7 +25,8 @@ import java.net.URL;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Enumeration;
-import java.util.Hashtable;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -40,32 +41,7 @@ import java.util.Properties;
  * 
  * @author Nicolas Dos Santos
  */
-public abstract class AndroidLogFactory extends LogFactory {
-
-    // Implementation note re AccessController usage
-    //
-    // It is important to keep code invoked via an AccessController to small
-    // auditable blocks. Such code must carefully evaluate all user input
-    // (parameters, system properties, config file contents, etc). As an 
-    // example, a Log implementation should not write to its logfile
-    // with an AccessController anywhere in the call stack, otherwise an
-    // insecure application could configure the log implementation to write
-    // to a protected file using the privileges granted to JCL rather than
-    // to the calling application.
-    //
-    // Under no circumstance should a non-private method return data that is
-    // retrieved via an AccessController. That would allow an insecure app
-    // to invoke that method and obtain data that it is not permitted to have.
-    //
-    // Invoking user-supplied code with an AccessController set is not a major
-    // issue (eg invoking the constructor of the class specified by 
-    // HASHTABLE_IMPLEMENTATION_PROPERTY). That class will be in a different
-    // trust domain, and therefore must have permissions to do whatever it
-    // is trying to do regardless of the permissions granted to JCL. There is
-    // a slight issue in that untrusted code may point that environment var
-    // to another trusted library, in which case the code runs if both that
-    // lib and JCL have the necessary permissions even when the untrusted
-    // caller does not. That's a pretty hard route to exploit though.
+public abstract class AndroidLogFactory {
 
     // ----------------------------------------------------- Manifest Constants
 
@@ -74,12 +50,6 @@ public abstract class AndroidLogFactory extends LogFactory {
      * value is a floating-point number; higher values take priority over lower values.
      */
     public static final String PRIORITY_KEY = "priority";
-
-    /**
-     * The name (<code>use_tccl</code>) of the key in the config file used to specify whether logging classes should be loaded via the thread context
-     * class loader (TCCL), or not. By default, the TCCL is used.
-     */
-    public static final String TCCL_KEY = "use_tccl";
 
     /**
      * The name (<code>org.apache.commons.logging.LogFactory</code>) of the property used to identify the AndroidLogFactory implementation class name.
@@ -96,12 +66,6 @@ public abstract class AndroidLogFactory extends LogFactory {
      * The name (<code>android-commons-logging.properties</code>) of the properties file to search for.
      */
     public static final String FACTORY_PROPERTIES = "android-commons-logging.properties";
-
-    /**
-     * JDK1.3+ <a href="http://java.sun.com/j2se/1.3/docs/guide/jar/jar.html#Service%20Provider"> 'Service Provider' specification</a>.
-     * 
-     */
-    protected static final String SERVICE_ID = "META-INF/services/org.apache.commons.logging.AndroidLogFactory";
 
     /**
      * The name (<code>org.apache.commons.logging.diagnostics.dest</code>) of the property used to enable internal commons-logging diagnostic output,
@@ -127,41 +91,16 @@ public abstract class AndroidLogFactory extends LogFactory {
     private static String diagnosticPrefix;
 
     /**
-     * <p>
-     * Setting this system property (<code>org.apache.commons.logging.AndroidLogFactory.HashtableImpl</code>) value allows the <code>Hashtable</code>
-     * used to store classloaders to be substituted by an alternative implementation.
-     * </p>
-     * <p>
-     * <strong>Note:</strong> <code>AndroidLogFactory</code> will print: <code><pre>
-     * [ERROR] AndroidLogFactory: Load of custom hashtable failed</em>
-     * </pre></code> to system error and then continue using a standard Hashtable.
-     * </p>
-     * <p>
-     * <strong>Usage:</strong> Set this property when Java is invoked and <code>AndroidLogFactory</code> will attempt to load a new instance of the
-     * given implementation class. For example, running the following ant scriplet: <code><pre>
-     *  &lt;java classname="${test.runner}" fork="yes" failonerror="${test.failonerror}"&gt;
-     *     ...
-     *     &lt;sysproperty 
-     *        key="org.apache.commons.logging.AndroidLogFactory.HashtableImpl"
-     *        value="org.apache.commons.logging.AltHashtable"/&gt;
-     *  &lt;/java&gt;
-     * </pre></code> will mean that <code>AndroidLogFactory</code> will load an instance of <code>org.apache.commons.logging.AltHashtable</code>.
-     * </p>
-     * <p>
-     * A typical use case is to allow a custom Hashtable implementation using weak references to be substituted. This will allow classloaders to be
-     * garbage collected without the need to release them (on 1.3+ JVMs only, of course ;)
-     * </p>
-     */
-    public static final String HASHTABLE_IMPLEMENTATION_PROPERTY = "org.apache.commons.logging.AndroidLogFactory.HashtableImpl";
-    /** Name used to load the weak hashtable implementation by names */
-    private static final String WEAK_HASHTABLE_CLASSNAME = "org.apache.commons.logging.impl.WeakHashtable";
-
-    /**
      * A reference to the classloader that loaded this class. This is the same as AndroidLogFactory.class.getClassLoader(). However computing this
      * value isn't quite as simple as that, as we potentially need to use AccessControllers etc. It's more efficient to compute it once and cache it
      * here.
      */
     private static ClassLoader thisClassLoader;
+
+    /**
+     * The previously constructed <code>AndroidLogFactory</code> instances, keyed by the <code>ClassLoader</code> with which it was created.
+     */
+    protected static Map<ClassLoader, AndroidLogFactory> factories = null;
 
     // ----------------------------------------------------------- Constructors
 
@@ -173,20 +112,30 @@ public abstract class AndroidLogFactory extends LogFactory {
 
     // --------------------------------------------------------- Public Methods
 
+    static {
+        // note: it's safe to call methods before initDiagnostics (though
+        // diagnostic output gets discarded).
+        thisClassLoader = getClassLoader(AndroidLogFactory.class);
+        initDiagnostics();
+        logClassLoaderEnvironment(AndroidLogFactory.class);
+        factories = new HashMap<ClassLoader, AndroidLogFactory>();
+        if (isDiagnosticsEnabled()) {
+            logDiagnostic("BOOTSTRAP COMPLETED");
+        }
+    }
+
     /**
      * Return the configuration attribute with the specified name (if any), or <code>null</code> if there is no such attribute.
      * 
      * @param name
      *            Name of the attribute to return
      */
-    @Override
     public abstract Object getAttribute(String name);
 
     /**
      * Return an array containing the names of all currently defined configuration attributes. If there are no such attributes, a zero length array is
      * returned.
      */
-    @Override
     public abstract String[] getAttributeNames();
 
     /**
@@ -198,8 +147,7 @@ public abstract class AndroidLogFactory extends LogFactory {
      * @exception LogConfigurationException
      *                if a suitable <code>Log</code> instance cannot be returned
      */
-    @Override
-    public abstract Log getInstance(Class clazz) throws LogConfigurationException;
+    public abstract Log getInstance(Class<?> clazz) throws LogConfigurationException;
 
     /**
      * <p>
@@ -219,7 +167,6 @@ public abstract class AndroidLogFactory extends LogFactory {
      * @exception LogConfigurationException
      *                if a suitable <code>Log</code> instance cannot be returned
      */
-    @Override
     public abstract Log getInstance(String name) throws LogConfigurationException;
 
     /**
@@ -227,7 +174,6 @@ public abstract class AndroidLogFactory extends LogFactory {
      * servlet containers, which implement application reloading by throwing away a ClassLoader. Dangling references to objects in that class loader
      * would prevent garbage collection.
      */
-    @Override
     public abstract void release();
 
     /**
@@ -236,7 +182,6 @@ public abstract class AndroidLogFactory extends LogFactory {
      * @param name
      *            Name of the attribute to remove
      */
-    @Override
     public abstract void removeAttribute(String name);
 
     /**
@@ -248,74 +193,7 @@ public abstract class AndroidLogFactory extends LogFactory {
      * @param value
      *            Value of the attribute to set, or <code>null</code> to remove any setting for this attribute
      */
-    @Override
     public abstract void setAttribute(String name, Object value);
-
-    // ------------------------------------------------------- Static Variables
-
-    /**
-     * The previously constructed <code>AndroidLogFactory</code> instances, keyed by the <code>ClassLoader</code> with which it was created.
-     */
-    protected static Hashtable factories = null;
-
-    /**
-     * Prevously constructed <code>AndroidLogFactory</code> instance as in the <code>factories</code> map, but for the case where
-     * <code>getClassLoader</code> returns <code>null</code>. This can happen when:
-     * <ul>
-     * <li>using JDK1.1 and the calling code is loaded via the system classloader (very common)</li>
-     * <li>using JDK1.2+ and the calling code is loaded via the boot classloader (only likely for embedded systems work).</li>
-     * </ul>
-     * Note that <code>factories</code> is a <i>Hashtable</i> (not a HashMap), and hashtables don't allow null as a key.
-     */
-    protected static AndroidLogFactory nullClassLoaderFactory = null;
-
-    /**
-     * Create the hashtable which will be used to store a map of (context-classloader -> AndroidLogFactory-object). Version 1.2+ of Java supports
-     * "weak references", allowing a custom Hashtable class to be used which uses only weak references to its keys. Using weak references can fix
-     * memory leaks on webapp unload in some cases (though not all). Version 1.1 of Java does not support weak references, so we must dynamically
-     * determine which we are using. And just for fun, this code also supports the ability for a system property to specify an arbitrary Hashtable
-     * implementation name.
-     * <p>
-     * Note that the correct way to ensure no memory leaks occur is to ensure that AndroidLogFactory.release(contextClassLoader) is called whenever a
-     * webapp is undeployed.
-     */
-    private static final Hashtable createFactoryStore() {
-        Hashtable result = null;
-        String storeImplementationClass;
-        try {
-            storeImplementationClass = getSystemProperty(HASHTABLE_IMPLEMENTATION_PROPERTY, null);
-        } catch (SecurityException ex) {
-            // Permissions don't allow this to be accessed. Default to the "modern"
-            // weak hashtable implementation if it is available.
-            storeImplementationClass = null;
-        }
-
-        if (storeImplementationClass == null) {
-            storeImplementationClass = WEAK_HASHTABLE_CLASSNAME;
-        }
-        try {
-            Class implementationClass = Class.forName(storeImplementationClass);
-            result = (Hashtable) implementationClass.newInstance();
-
-        } catch (Throwable t) {
-            // ignore
-            if (!WEAK_HASHTABLE_CLASSNAME.equals(storeImplementationClass)) {
-                // if the user's trying to set up a custom implementation, give a clue
-                if (isDiagnosticsEnabled()) {
-                    // use internal logging to issue the warning
-                    logDiagnostic("[ERROR] AndroidLogFactory: Load of custom hashtable failed");
-                } else {
-                    // we *really* want this output, even if diagnostics weren't
-                    // explicitly enabled by the user.
-                    System.err.println("[ERROR] AndroidLogFactory: Load of custom hashtable failed");
-                }
-            }
-        }
-        if (result == null) {
-            result = new Hashtable();
-        }
-        return result;
-    }
 
     // --------------------------------------------------------- Static Methods
 
@@ -355,17 +233,8 @@ public abstract class AndroidLogFactory extends LogFactory {
      *                if the implementation class is not available or cannot be instantiated.
      */
     public static AndroidLogFactory getFactory() throws LogConfigurationException {
-        if (thisClassLoader == null) {
-            // This is an odd enough situation to report about. This
-            // output will be a nuisance on JDK1.1, as the system
-            // classloader is null in that environment.
-            if (isDiagnosticsEnabled()) {
-                logDiagnostic("Classloader is null.");
-            }
-        }
-
         // Return any previously registered factory for this class loader
-        AndroidLogFactory factory = getCachedFactory(thisClassLoader);
+        AndroidLogFactory factory = factories.get(thisClassLoader);
         if (factory != null) {
             return factory;
         }
@@ -377,14 +246,6 @@ public abstract class AndroidLogFactory extends LogFactory {
         }
 
         // Load properties file.
-        //
-        // If the properties file exists, then its contents are used as
-        // "attributes" on the AndroidLogFactory implementation class. One particular
-        // property may also control which AndroidLogFactory concrete subclass is
-        // used, but only if other discovery mechanisms fail..
-        //
-        // As the properties file (if it exists) will be used one way or 
-        // another in the end we may as well look for it first.
         Properties props = getConfigurationFile(thisClassLoader, FACTORY_PROPERTIES);
 
         // Determine which concrete AndroidLogFactory subclass to use.
@@ -440,7 +301,6 @@ public abstract class AndroidLogFactory extends LogFactory {
                         logDiagnostic("[LOOKUP] Properties file specifies AndroidLogFactory subclass '" + factoryClass + "'");
                     }
                     factory = newFactory(factoryClass, thisClassLoader);
-                    // TODO: think about whether we need to handle exceptions from newFactory
                 } else {
                     if (isDiagnosticsEnabled()) {
                         logDiagnostic("[LOOKUP] Properties file has no entry specifying AndroidLogFactory subclass.");
@@ -474,16 +334,13 @@ public abstract class AndroidLogFactory extends LogFactory {
         }
 
         if (factory != null) {
-            /**
-             * Always cache using context class loader.
-             */
-            cacheFactory(thisClassLoader, factory);
+            // Always cache using context class loader.
+            factories.put(thisClassLoader, factory);
 
             if (props != null) {
-                Enumeration names = props.propertyNames();
-                while (names.hasMoreElements()) {
-                    String name = (String) names.nextElement();
-                    String value = props.getProperty(name);
+                for (Map.Entry<Object, Object> entry : props.entrySet()) {
+                    String name = (String) entry.getKey();
+                    String value = (String) entry.getValue();
                     factory.setAttribute(name, value);
                 }
             }
@@ -501,10 +358,8 @@ public abstract class AndroidLogFactory extends LogFactory {
      * @exception LogConfigurationException
      *                if a suitable <code>Log</code> instance cannot be returned
      */
-    public static Log getLog(Class clazz) throws LogConfigurationException {
-
+    public static Log getLog(Class<?> clazz) throws LogConfigurationException {
         return (getFactory().getInstance(clazz));
-
     }
 
     /**
@@ -534,17 +389,10 @@ public abstract class AndroidLogFactory extends LogFactory {
             logDiagnostic("Releasing factory for classloader " + objectId(classLoader));
         }
         synchronized (factories) {
-            if (classLoader == null) {
-                if (nullClassLoaderFactory != null) {
-                    nullClassLoaderFactory.release();
-                    nullClassLoaderFactory = null;
-                }
-            } else {
-                AndroidLogFactory factory = (AndroidLogFactory) factories.get(classLoader);
-                if (factory != null) {
-                    factory.release();
-                    factories.remove(classLoader);
-                }
+            AndroidLogFactory factory = factories.get(classLoader);
+            if (factory != null) {
+                factory.release();
+                factories.remove(classLoader);
             }
         }
 
@@ -556,24 +404,15 @@ public abstract class AndroidLogFactory extends LogFactory {
      * throwing away a ClassLoader. Dangling references to objects in that class loader would prevent garbage collection.
      */
     public static void releaseAll() {
-
         if (isDiagnosticsEnabled()) {
             logDiagnostic("Releasing factory for all classloaders.");
         }
         synchronized (factories) {
-            Enumeration elements = factories.elements();
-            while (elements.hasMoreElements()) {
-                AndroidLogFactory element = (AndroidLogFactory) elements.nextElement();
+            for (AndroidLogFactory element : factories.values()) {
                 element.release();
             }
             factories.clear();
-
-            if (nullClassLoaderFactory != null) {
-                nullClassLoaderFactory.release();
-                nullClassLoaderFactory = null;
-            }
         }
-
     }
 
     // ------------------------------------------------------ Protected Methods
@@ -596,7 +435,7 @@ public abstract class AndroidLogFactory extends LogFactory {
      * 
      * @since 1.1
      */
-    protected static ClassLoader getClassLoader(Class clazz) {
+    protected static ClassLoader getClassLoader(Class<?> clazz) {
         try {
             return clazz.getClassLoader();
         } catch (SecurityException ex) {
@@ -608,78 +447,7 @@ public abstract class AndroidLogFactory extends LogFactory {
     }
 
     /**
-     * Check cached factories (keyed by contextClassLoader)
-     * 
-     * @param contextClassLoader
-     *            is the context classloader associated with the current thread. This allows separate AndroidLogFactory objects per component within a
-     *            container, provided each component has a distinct context classloader set. This parameter may be null in JDK1.1, and in embedded
-     *            systems where jcl-using code is placed in the bootclasspath.
-     * 
-     * @return the factory associated with the specified classloader if one has previously been created, or null if this is the first time we have
-     *         seen this particular classloader.
-     */
-    private static AndroidLogFactory getCachedFactory(ClassLoader contextClassLoader) {
-        AndroidLogFactory factory = null;
-
-        if (contextClassLoader == null) {
-            // We have to handle this specially, as factories is a Hashtable
-            // and those don't accept null as a key value.
-            //
-            // nb: nullClassLoaderFactory might be null. That's ok.
-            factory = nullClassLoaderFactory;
-        } else {
-            factory = (AndroidLogFactory) factories.get(contextClassLoader);
-        }
-
-        return factory;
-    }
-
-    /**
-     * Remember this factory, so later calls to AndroidLogFactory.getCachedFactory can return the previously created object (together with all its
-     * cached Log objects).
-     * 
-     * @param classLoader
-     *            should be the current context classloader. Note that this can be null under some circumstances; this is ok.
-     * 
-     * @param factory
-     *            should be the factory to cache. This should never be null.
-     */
-    private static void cacheFactory(ClassLoader classLoader, AndroidLogFactory factory) {
-        // Ideally we would assert(factory != null) here. However reporting
-        // errors from within a logging implementation is a little tricky!
-
-        if (factory != null) {
-            if (classLoader == null) {
-                nullClassLoaderFactory = factory;
-            } else {
-                factories.put(classLoader, factory);
-            }
-        }
-    }
-
-    /**
-     * Return a new instance of the specified <code>AndroidLogFactory</code> implementation class, loaded by the specified class loader. If that
-     * fails, try the class loader used to load this (abstract) AndroidLogFactory.
-     * <p>
-     * <h2>ClassLoader conflicts</h2>
-     * Note that there can be problems if the specified ClassLoader is not the same as the classloader that loaded this class, ie when loading a
-     * concrete AndroidLogFactory subclass via a context classloader.
-     * <p>
-     * The problem is the same one that can occur when loading a concrete Log subclass via a context classloader.
-     * <p>
-     * The problem occurs when code running in the context classloader calls class X which was loaded via a parent classloader, and class X then calls
-     * AndroidLogFactory.getFactory (either directly or via AndroidLogFactory.getLog). Because class X was loaded via the parent, it binds to
-     * AndroidLogFactory loaded via the parent. When the code in this method finds some AndroidLogFactoryYYYY class in the child (context)
-     * classloader, and there also happens to be a AndroidLogFactory class defined in the child classloader, then AndroidLogFactoryYYYY will be bound
-     * to AndroidLogFactory@childloader. It cannot be cast to AndroidLogFactory@parentloader, ie this method cannot return the object as the desired
-     * type. Note that it doesn't matter if the AndroidLogFactory class in the child classloader is identical to the AndroidLogFactory class in the
-     * parent classloader, they are not compatible.
-     * <p>
-     * The solution taken here is to simply print out an error message when this occurs then throw an exception. The deployer of the application must
-     * ensure they remove all occurrences of the AndroidLogFactory class from the child classloader in order to resolve the issue. Note that they do
-     * not have to move the custom AndroidLogFactory subclass; that is ok as long as the only AndroidLogFactory class it can find to bind to is in the
-     * parent classloader.
-     * <p>
+     * Return a new instance of the specified <code>AndroidLogFactory</code> implementation class, loaded by the specified class loader.
      * 
      * @param factoryClass
      *            Fully qualified name of the <code>AndroidLogFactory</code> implementation class
@@ -696,7 +464,7 @@ public abstract class AndroidLogFactory extends LogFactory {
         // Note that any unchecked exceptions thrown by the createFactory
         // method will propagate out of this method; in particular a
         // ClassCastException can be thrown.
-        Object result = AccessController.doPrivileged(new PrivilegedAction() {
+        Object result = AccessController.doPrivileged(new PrivilegedAction<Object>() {
             public Object run() {
                 return createFactory(factoryClass, classLoader);
             }
@@ -715,141 +483,36 @@ public abstract class AndroidLogFactory extends LogFactory {
         return (AndroidLogFactory) result;
     }
 
-    /**
-     * Implements the operations described in the javadoc for newFactory.
-     * 
-     * @param factoryClass
-     * 
-     * @param classLoader
-     *            used to load the specified factory class. This is expected to be either the TCCL or the classloader which loaded this class. Note
-     *            that the classloader which loaded this class might be "null" (ie the bootloader) for embedded systems.
-     * 
-     * @return either a AndroidLogFactory object or a LogConfigurationException object.
-     * @since 1.1
-     */
     protected static Object createFactory(String factoryClass, ClassLoader classLoader) {
-
         // This will be used to diagnose bad configurations
         // and allow a useful message to be sent to the user
-        Class AndroidLogFactoryClass = null;
+        Class<?> AndroidLogFactoryClass = null;
         try {
             if (classLoader != null) {
-                try {
-                    // First the given class loader param (thread class loader)
-
-                    // Warning: must typecast here & allow exception
-                    // to be generated/caught & recast properly.
-                    AndroidLogFactoryClass = classLoader.loadClass(factoryClass);
-                    if (AndroidLogFactory.class.isAssignableFrom(AndroidLogFactoryClass)) {
-                        if (isDiagnosticsEnabled()) {
-                            logDiagnostic("Loaded class " + AndroidLogFactoryClass.getName() + " from classloader " + objectId(classLoader));
-                        }
-                    } else {
-                        //
-                        // This indicates a problem with the ClassLoader tree.
-                        // An incompatible ClassLoader was used to load the 
-                        // implementation. 
-                        // As the same classes
-                        // must be available in multiple class loaders,
-                        // it is very likely that multiple JCL jars are present.
-                        // The most likely fix for this
-                        // problem is to remove the extra JCL jars from the 
-                        // ClassLoader hierarchy. 
-                        //
-                        if (isDiagnosticsEnabled()) {
-                            logDiagnostic("Factory class " + AndroidLogFactoryClass.getName() + " loaded from classloader "
-                                    + objectId(AndroidLogFactoryClass.getClassLoader()) + " does not extend '" + AndroidLogFactory.class.getName()
-                                    + "' as loaded by this classloader.");
-                            logHierarchy("[BAD CL TREE] ", classLoader);
-                        }
+                // Warning: must typecast here & allow exception
+                // to be generated/caught & recast properly.
+                AndroidLogFactoryClass = classLoader.loadClass(factoryClass);
+                if (AndroidLogFactory.class.isAssignableFrom(AndroidLogFactoryClass)) {
+                    if (isDiagnosticsEnabled()) {
+                        logDiagnostic("Loaded class " + AndroidLogFactoryClass.getName() + " from classloader " + objectId(classLoader));
                     }
-
-                    return AndroidLogFactoryClass.newInstance();
-
-                } catch (ClassNotFoundException ex) {
-                    if (classLoader == thisClassLoader) {
-                        // Nothing more to try, onwards.
-                        if (isDiagnosticsEnabled()) {
-                            logDiagnostic("Unable to locate any class called '" + factoryClass + "' via classloader " + objectId(classLoader));
-                        }
-                        throw ex;
+                } else {
+                    if (isDiagnosticsEnabled()) {
+                        logDiagnostic("Factory class " + AndroidLogFactoryClass.getName() + " loaded from classloader "
+                                + objectId(AndroidLogFactoryClass.getClassLoader()) + " does not extend '" + AndroidLogFactory.class.getName()
+                                + "' as loaded by this classloader.");
                     }
-                    // ignore exception, continue
-                } catch (NoClassDefFoundError e) {
-                    if (classLoader == thisClassLoader) {
-                        // Nothing more to try, onwards.
-                        if (isDiagnosticsEnabled()) {
-                            logDiagnostic("Class '" + factoryClass + "' cannot be loaded" + " via classloader " + objectId(classLoader)
-                                    + " - it depends on some other class that cannot" + " be found.");
-                        }
-                        throw e;
-                    }
-                    // ignore exception, continue
-                } catch (ClassCastException e) {
-                    if (classLoader == thisClassLoader) {
-                        // There's no point in falling through to the code below that
-                        // tries again with thisClassLoader, because we've just tried
-                        // loading with that loader (not the TCCL). Just throw an
-                        // appropriate exception here.
-
-                        final boolean implementsAndroidLogFactory = implementsAndroidLogFactory(AndroidLogFactoryClass);
-
-                        //
-                        // Construct a good message: users may not actual expect that a custom implementation 
-                        // has been specified. Several well known containers use this mechanism to adapt JCL 
-                        // to their native logging system. 
-                        // 
-                        String msg = "The application has specified that a custom AndroidLogFactory implementation should be used but " + "Class '"
-                                + factoryClass + "' cannot be converted to '" + AndroidLogFactory.class.getName() + "'. ";
-                        if (implementsAndroidLogFactory) {
-                            msg = msg + "The conflict is caused by the presence of multiple AndroidLogFactory classes in incompatible classloaders. "
-                                    + "Background can be found in http://commons.apache.org/logging/tech.html. "
-                                    + "If you have not explicitly specified a custom AndroidLogFactory then it is likely that "
-                                    + "the container has set one without your knowledge. "
-                                    + "In this case, consider using the commons-logging-adapters.jar file or "
-                                    + "specifying the standard AndroidLogFactory from the command line. ";
-                        } else {
-                            msg = msg + "Please check the custom implementation. ";
-                        }
-                        msg = msg + "Help can be found @http://commons.apache.org/logging/troubleshooting.html.";
-
-                        if (isDiagnosticsEnabled()) {
-                            logDiagnostic(msg);
-                        }
-
-                        ClassCastException ex = new ClassCastException(msg);
-                        throw ex;
-                    }
-
-                    // Ignore exception, continue. Presumably the classloader was the
-                    // TCCL; the code below will try to load the class via thisClassLoader.
-                    // This will handle the case where the original calling class is in
-                    // a shared classpath but the TCCL has a copy of AndroidLogFactory and the
-                    // specified AndroidLogFactory implementation; we will fall back to using the
-                    // AndroidLogFactory implementation from the same classloader as this class.
-                    //
-                    // Issue: this doesn't handle the reverse case, where this AndroidLogFactory
-                    // is in the webapp, and the specified AndroidLogFactory implementation is
-                    // in a shared classpath. In that case:
-                    // (a) the class really does implement AndroidLogFactory (bad log msg above)
-                    // (b) the fallback code will result in exactly the same problem.
                 }
-            }
 
-            /* At this point, either classLoader == null, OR
-             * classLoader was unable to load factoryClass.
-             *
-             * In either case, we call Class.forName, which is equivalent
-             * to AndroidLogFactory.class.getClassLoader().load(name), ie we ignore
-             * the classloader parameter the caller passed, and fall back
-             * to trying the classloader associated with this class. See the
-             * javadoc for the newFactory method for more info on the 
-             * consequences of this.
-             *
-             * Notes:
-             * * AndroidLogFactory.class.getClassLoader() may return 'null'
-             *   if AndroidLogFactory is loaded by the bootstrap classloader.
-             */
+                return AndroidLogFactoryClass.newInstance();
+            }
+        } catch (Exception e) {
+            if (isDiagnosticsEnabled()) {
+                logDiagnostic("Unable to create AndroidLogFactory instance.\n" + e);
+            }
+        }
+
+        try {
             // Warning: must typecast here & allow exception
             // to be generated/caught & recast properly.
             if (isDiagnosticsEnabled()) {
@@ -864,90 +527,11 @@ public abstract class AndroidLogFactory extends LogFactory {
                 logDiagnostic("Unable to create AndroidLogFactory instance.");
             }
             if (AndroidLogFactoryClass != null && !AndroidLogFactory.class.isAssignableFrom(AndroidLogFactoryClass)) {
-
                 return new LogConfigurationException("The chosen AndroidLogFactory implementation does not extend AndroidLogFactory."
                         + " Please check your configuration.", e);
             }
             return new LogConfigurationException(e);
         }
-    }
-
-    /**
-     * Determines whether the given class actually implements <code>AndroidLogFactory</code>. Diagnostic information is also logged.
-     * <p>
-     * <strong>Usage:</strong> to diagnose whether a classloader conflict is the cause of incompatibility. The test used is whether the class is
-     * assignable from the <code>AndroidLogFactory</code> class loaded by the class's classloader.
-     * 
-     * @param AndroidLogFactoryClass
-     *            <code>Class</code> which may implement <code>AndroidLogFactory</code>
-     * @return true if the <code>AndroidLogFactoryClass</code> does extend <code>AndroidLogFactory</code> when that class is loaded via the same
-     *         classloader that loaded the <code>AndroidLogFactoryClass</code>.
-     */
-    private static boolean implementsAndroidLogFactory(Class AndroidLogFactoryClass) {
-        boolean implementsAndroidLogFactory = false;
-        if (AndroidLogFactoryClass != null) {
-            try {
-                ClassLoader AndroidLogFactoryClassLoader = AndroidLogFactoryClass.getClassLoader();
-                if (AndroidLogFactoryClassLoader == null) {
-                    logDiagnostic("[CUSTOM LOG FACTORY] was loaded by the boot classloader");
-                } else {
-                    logHierarchy("[CUSTOM LOG FACTORY] ", AndroidLogFactoryClassLoader);
-                    Class factoryFromCustomLoader = Class
-                            .forName("org.apache.commons.logging.AndroidLogFactory", false, AndroidLogFactoryClassLoader);
-                    implementsAndroidLogFactory = factoryFromCustomLoader.isAssignableFrom(AndroidLogFactoryClass);
-                    if (implementsAndroidLogFactory) {
-                        logDiagnostic("[CUSTOM LOG FACTORY] " + AndroidLogFactoryClass.getName()
-                                + " implements AndroidLogFactory but was loaded by an incompatible classloader.");
-                    } else {
-                        logDiagnostic("[CUSTOM LOG FACTORY] " + AndroidLogFactoryClass.getName() + " does not implement AndroidLogFactory.");
-                    }
-                }
-            } catch (SecurityException e) {
-                //
-                // The application is running within a hostile security environment.
-                // This will make it very hard to diagnose issues with JCL.
-                // Consider running less securely whilst debugging this issue.
-                //
-                logDiagnostic("[CUSTOM LOG FACTORY] SecurityException thrown whilst trying to determine whether "
-                        + "the compatibility was caused by a classloader conflict: " + e.getMessage());
-            } catch (LinkageError e) {
-                //
-                // This should be an unusual circumstance.
-                // LinkageError's usually indicate that a dependent class has incompatibly changed.
-                // Another possibility may be an exception thrown by an initializer.
-                // Time for a clean rebuild?
-                //
-                logDiagnostic("[CUSTOM LOG FACTORY] LinkageError thrown whilst trying to determine whether "
-                        + "the compatibility was caused by a classloader conflict: " + e.getMessage());
-            } catch (ClassNotFoundException e) {
-                //
-                // AndroidLogFactory cannot be loaded by the classloader which loaded the custom factory implementation.
-                // The custom implementation is not viable until this is corrected.
-                // Ensure that the JCL jar and the custom class are available from the same classloader.
-                // Running with diagnostics on should give information about the classloaders used
-                // to load the custom factory.
-                //
-                logDiagnostic("[CUSTOM LOG FACTORY] AndroidLogFactory class cannot be loaded by classloader which loaded the "
-                        + "custom AndroidLogFactory implementation. Is the custom factory in the right classloader?");
-            }
-        }
-        return implementsAndroidLogFactory;
-    }
-
-    /**
-     * Applets may run in an environment where accessing resources of a loader is a secure operation, but where the commons-logging library has
-     * explicitly been granted permission for that operation. In this case, we need to run the operation using an AccessController.
-     */
-    private static InputStream getResourceAsStream(final ClassLoader loader, final String name) {
-        return (InputStream) AccessController.doPrivileged(new PrivilegedAction() {
-            public Object run() {
-                if (loader != null) {
-                    return loader.getResourceAsStream(name);
-                } else {
-                    return ClassLoader.getSystemResourceAsStream(name);
-                }
-            }
-        });
     }
 
     /**
@@ -959,9 +543,9 @@ public abstract class AndroidLogFactory extends LogFactory {
      * If no instances are found, an Enumeration is returned whose hasMoreElements method returns false (ie an "empty" enumeration). If resources
      * could not be listed for some reason, null is returned.
      */
-    private static Enumeration getResources(final ClassLoader loader, final String name) {
-        PrivilegedAction action = new PrivilegedAction() {
-            public Object run() {
+    private static Enumeration<URL> getResources(final ClassLoader loader, final String name) {
+        PrivilegedAction<Enumeration<URL>> action = new PrivilegedAction<Enumeration<URL>>() {
+            public Enumeration<URL> run() {
                 try {
                     if (loader != null) {
                         return loader.getResources(name);
@@ -974,15 +558,11 @@ public abstract class AndroidLogFactory extends LogFactory {
                     }
                     return null;
                 } catch (NoSuchMethodError e) {
-                    // we must be running on a 1.1 JVM which doesn't support
-                    // ClassLoader.getSystemResources; just return null in
-                    // this case.
                     return null;
                 }
             }
         };
-        Object result = AccessController.doPrivileged(action);
-        return (Enumeration) result;
+        return AccessController.doPrivileged(action);
     }
 
     /**
@@ -992,8 +572,8 @@ public abstract class AndroidLogFactory extends LogFactory {
      * Null is returned if the URL cannot be opened.
      */
     private static Properties getProperties(final URL url) {
-        PrivilegedAction action = new PrivilegedAction() {
-            public Object run() {
+        PrivilegedAction<Properties> action = new PrivilegedAction<Properties>() {
+            public Properties run() {
                 try {
                     InputStream stream = url.openStream();
                     if (stream != null) {
@@ -1011,7 +591,7 @@ public abstract class AndroidLogFactory extends LogFactory {
                 return null;
             }
         };
-        return (Properties) AccessController.doPrivileged(action);
+        return AccessController.doPrivileged(action);
     }
 
     /**
@@ -1035,14 +615,14 @@ public abstract class AndroidLogFactory extends LogFactory {
         double priority = 0.0;
         URL propsUrl = null;
         try {
-            Enumeration urls = getResources(classLoader, fileName);
+            Enumeration<URL> urls = getResources(classLoader, fileName);
 
             if (urls == null) {
                 return null;
             }
 
             while (urls.hasMoreElements()) {
-                URL url = (URL) urls.nextElement();
+                URL url = urls.nextElement();
 
                 Properties newProps = getProperties(url);
                 if (newProps != null) {
@@ -1109,8 +689,8 @@ public abstract class AndroidLogFactory extends LogFactory {
      * access data that should not be available to it.
      */
     private static String getSystemProperty(final String key, final String def) throws SecurityException {
-        return (String) AccessController.doPrivileged(new PrivilegedAction() {
-            public Object run() {
+        return AccessController.doPrivileged(new PrivilegedAction<String>() {
+            public String run() {
                 return System.getProperty(key, def);
             }
         });
@@ -1148,22 +728,12 @@ public abstract class AndroidLogFactory extends LogFactory {
             }
         }
 
-        // In order to avoid confusion where multiple instances of JCL are
-        // being used via different classloaders within the same app, we
-        // ensure each logged message has a prefix of form
-        // [AndroidLogFactory from classloader OID]
-        //
-        // Note that this prefix should be kept consistent with that 
-        // in AndroidLogFactoryImpl. However here we don't need to output info
-        // about the actual *instance* of AndroidLogFactory, as all methods that
-        // output diagnostics from this class are static.
         String classLoaderName;
         try {
-            ClassLoader classLoader = thisClassLoader;
             if (thisClassLoader == null) {
                 classLoaderName = "BOOTLOADER";
             } else {
-                classLoaderName = objectId(classLoader);
+                classLoaderName = objectId(thisClassLoader);
             }
         } catch (SecurityException e) {
             classLoaderName = "UNKNOWN";
@@ -1171,32 +741,10 @@ public abstract class AndroidLogFactory extends LogFactory {
         diagnosticPrefix = "[AndroidLogFactory from " + classLoaderName + "] ";
     }
 
-    /**
-     * Indicates true if the user has enabled internal logging.
-     * <p>
-     * By the way, sorry for the incorrect grammar, but calling this method areDiagnosticsEnabled just isn't java beans style.
-     * 
-     * @return true if calls to logDiagnostic will have any effect.
-     * @since 1.1
-     */
     protected static boolean isDiagnosticsEnabled() {
         return diagnosticsStream != null;
     }
 
-    /**
-     * Write the specified message to the internal logging destination.
-     * <p>
-     * Note that this method is private; concrete subclasses of this class should not call it because the diagnosticPrefix string this method puts in
-     * front of all its messages is AndroidLogFactory@...., while subclasses should put SomeSubClass@...
-     * <p>
-     * Subclasses should instead compute their own prefix, then call logRawDiagnostic. Note that calling isDiagnosticsEnabled is fine for subclasses.
-     * <p>
-     * Note that it is safe to call this method before initDiagnostics is called; any output will just be ignored (as isDiagnosticsEnabled will return
-     * false).
-     * 
-     * @param msg
-     *            is the diagnostic message to be output.
-     */
     private static final void logDiagnostic(String msg) {
         if (diagnosticsStream != null) {
             diagnosticsStream.print(diagnosticPrefix);
@@ -1205,19 +753,12 @@ public abstract class AndroidLogFactory extends LogFactory {
         }
     }
 
-    /**
-     * Write the specified message to the internal logging destination.
-     * 
-     * @param msg
-     *            is the diagnostic message to be output.
-     * @since 1.1
-     */
-    /*protected static final void logRawDiagnostic(String msg) {
+    protected static final void logRawDiagnostic(String msg) {
         if (diagnosticsStream != null) {
             diagnosticsStream.println(msg);
             diagnosticsStream.flush();
         }
-    }*/
+    }
 
     /**
      * Generate useful diagnostics regarding the classloader tree for the specified class.
@@ -1234,7 +775,7 @@ public abstract class AndroidLogFactory extends LogFactory {
      * @param clazz
      *            is the class whose classloader + tree are to be output.
      */
-    private static void logClassLoaderEnvironment(Class clazz) {
+    private static void logClassLoaderEnvironment(Class<?> clazz) {
         if (!isDiagnosticsEnabled()) {
             return;
         }
@@ -1321,44 +862,12 @@ public abstract class AndroidLogFactory extends LogFactory {
      * @param o
      *            may be null.
      * @return a string of form classname@hashcode, or "null" if param o is null.
-     * @since 1.1
      */
     public static String objectId(Object o) {
         if (o == null) {
             return "null";
         } else {
             return o.getClass().getName() + "@" + System.identityHashCode(o);
-        }
-    }
-
-    // ----------------------------------------------------------------------
-    // Static initialiser block to perform initialisation at class load time.
-    //
-    // We can't do this in the class constructor, as there are many 
-    // static methods on this class that can be called before any
-    // AndroidLogFactory instances are created, and they depend upon this
-    // stuff having been set up.
-    //
-    // Note that this block must come after any variable declarations used
-    // by any methods called from this block, as we want any static initialiser
-    // associated with the variable to run first. If static initialisers for
-    // variables run after this code, then (a) their value might be needed
-    // by methods called from here, and (b) they might *override* any value
-    // computed here!
-    //
-    // So the wisest thing to do is just to place this code at the very end
-    // of the class file.
-    // ----------------------------------------------------------------------
-
-    static {
-        // note: it's safe to call methods before initDiagnostics (though
-        // diagnostic output gets discarded).
-        thisClassLoader = getClassLoader(AndroidLogFactory.class);
-        initDiagnostics();
-        logClassLoaderEnvironment(AndroidLogFactory.class);
-        factories = createFactoryStore();
-        if (isDiagnosticsEnabled()) {
-            logDiagnostic("BOOTSTRAP COMPLETED");
         }
     }
 }

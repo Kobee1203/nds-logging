@@ -68,7 +68,6 @@ public class AndroidLogger implements org.apache.commons.logging.Log, Serializab
     protected String name;
 
     public AndroidLogger() {
-
     }
 
     public AndroidLogger(String name) {
