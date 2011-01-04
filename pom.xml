@@ -9,10 +9,18 @@
 	<packaging>pom</packaging>
 	<name>NDS Logging</name>
 
-	<description>A Logger used to log messages for an Android application or any other java application. This can be useful when developing an Android library, and we write unit tests (JUnit) and integration tests (Android Unit tests).
-	It is based on two types of log:
-    * Android.util.Log: used to log an Android application
-    * Org.apache.commons.logging.Log: used for logging Any Other java application</description>
+	<description>
+		A Logger used to log messages for an Android application or any other java application. This can be useful when developing an Android library, and we write unit tests (JUnit) and integration tests (Android Unit tests).
+		It is based on two types of log: android.util.Log: used to log an Android application, org.apache.commons.logging.Log: used for logging Any Other java application.
+	</description>
+
+	<developers>
+		<developer>
+			<id>nicolas.dossantos</id>
+			<name>Nicolas Dos Santos</name>
+			<email>nicolas.dossantos@gmail.com</email>
+		</developer>
+	</developers>
 
 	<url>http://code.google.com/p/nds-logging/</url>
 
@@ -208,4 +216,13 @@
             <url>svn:svn+ssh:https://nds-logging.googlecode.com/svn/docs</url>
         </site>
     </distributionManagement>
+    
+    <reporting>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </reporting>
 </project>
