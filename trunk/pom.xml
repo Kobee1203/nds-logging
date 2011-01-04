@@ -7,7 +7,7 @@
 	<artifactId>nds-logging-parent</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
-	<name>NDS Logging</name>
+	<name>NDS Logging parent</name>
 
 	<description>
 		A Logger used to log messages for an Android application or any other java application. This can be useful when developing an Android library, and we write unit tests (JUnit) and integration tests (Android Unit tests).
