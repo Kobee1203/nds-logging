@@ -9,9 +9,24 @@
 	<packaging>pom</packaging>
 	<name>NDS Logging</name>
 
-    <properties>
-        <maven.version>2.2.1</maven.version>
-    </properties>
+	<description>A Logger used to log messages for an Android application or any other java application. This can be useful when developing an Android library, and we write unit tests (JUnit) and integration tests (Android Unit tests).
+	It is based on two types of log:
+    * Android.util.Log: used to log an Android application
+    * Org.apache.commons.logging.Log: used for logging Any Other java application</description>
+
+	<url>http://code.google.com/p/nds-logging/</url>
+
+	<licenses>
+		<license>
+			<name>GNU General Public License v3.0</name>
+			<url>http://www.gnu.org/licenses/gpl.html</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
+	<properties>
+		<maven.version>2.2.1</maven.version>
+	</properties>
 
 	<modules>
 		<module>nds-logging</module>
@@ -40,12 +55,32 @@
 	</dependencyManagement>
 
 	<build>
+		<extensions>
+			<extension>
+				<groupId>org.jvnet.wagon-svn</groupId>
+				<artifactId>wagon-svn</artifactId>
+				<version>1.8</version>
+			</extension>
+		</extensions>
+
 		<pluginManagement>
 			<plugins>
 				<plugin>
 					<groupId>com.jayway.maven.plugins.android.generation2</groupId>
 					<artifactId>maven-android-plugin</artifactId>
 					<version>2.5.1</version>
+					<configuration>
+						<sdk>
+							<platform>3</platform>
+						</sdk>
+						<emulator>
+							<avd><!--my_avd -->
+							</avd>
+						</emulator>
+						<deleteConflictingFiles>true</deleteConflictingFiles>
+						<undeployBeforeDeploy>true</undeployBeforeDeploy>
+					</configuration>
+					<extensions>true</extensions>
 				</plugin>
 				<plugin>
 					<artifactId>maven-clean-plugin</artifactId>
@@ -96,27 +131,9 @@
 					<artifactId>versions-maven-plugin</artifactId>
 					<version>1.2</version>
 				</plugin>
-				<plugin>
-					<groupId>com.jayway.maven.plugins.android.generation2</groupId>
-					<artifactId>maven-android-plugin</artifactId>
-					<!-- change to explicit version for standalone project or remove if version 
-						inherited from company pom -->
-					<!--<version>2.4.1</version> -->
-					<configuration>
-						<sdk>
-							<platform>3</platform>
-						</sdk>
-						<emulator>
-							<avd><!--my_avd -->
-							</avd>
-						</emulator>
-						<deleteConflictingFiles>true</deleteConflictingFiles>
-						<undeployBeforeDeploy>true</undeployBeforeDeploy>
-					</configuration>
-					<extensions>true</extensions>
-				</plugin>
 			</plugins>
 		</pluginManagement>
+
 		<plugins>
 			<plugin>
 				<artifactId>maven-release-plugin</artifactId>
@@ -159,4 +176,36 @@
 		</plugins>
 	</build>
 
+	<repositories>
+		<repository>
+			<id>maven2-repository.dev.java.net</id>
+			<name>Java.net Repository for Maven</name>
+			<url>http://download.java.net/maven/2/</url>
+		</repository>
+	</repositories>
+
+	<scm>
+        <url>https://nds-logging.googlecode.com/svn/trunk</url>
+        <connection>scm:svn:https://nds-logging.googlecode.com/svn/trunk</connection>
+        <developerConnection>scm:svn:https://nds-logging.googlecode.com/svn/trunk</developerConnection>
+    </scm>
+
+	<distributionManagement>
+		<repository>
+			<id>googlecode-releases-repository</id>
+			<name>Google Code Releases Repository</name>
+			<uniqueVersion>false</uniqueVersion>
+			<url>svn:https://nds-logging.googlecode.com/svn/repo/releases</url>
+		</repository>
+		<snapshotRepository>
+			<id>googlecode-snapshots-repository</id>
+			<name>Google Code Snapshots Repository</name>
+			<uniqueVersion>false</uniqueVersion>
+			<url>svn:https://nds-logging.googlecode.com/svn/repo/snapshots</url>
+		</snapshotRepository>
+        <site>
+            <id>googlecode-docs</id>
+            <url>svn:svn+ssh:https://nds-logging.googlecode.com/svn/docs</url>
+        </site>
+    </distributionManagement>
 </project>
