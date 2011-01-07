@@ -18,4 +18,5 @@
         android:targetPackage="org.nds.logging"
         android:label="NDS Logging Instrumentation" />
 
+	<uses-sdk android:minSdkVersion="3" />
 </manifest> 
