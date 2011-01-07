@@ -8,4 +8,5 @@
     </application>
 
     <instrumentation android:targetPackage="org.nds.logging" android:name="android.test.InstrumentationTestRunner" />
+	<uses-sdk android:minSdkVersion="3" />
 </manifest> 
