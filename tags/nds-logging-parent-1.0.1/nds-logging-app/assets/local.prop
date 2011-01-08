@@ -1,0 +1,2 @@
+log.tag.org.nds.logging.test.AndroidLoggingTest = VERBOSE
+log.tag.TAGTEST = VERBOSE
