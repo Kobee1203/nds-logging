@@ -172,19 +172,5 @@ It is based on two types of log: android.util.Log: used to log an Android applic
 			<uniqueVersion>false</uniqueVersion>
 			<url>svn:https://nds-logging.googlecode.com/svn/repo/snapshots</url>
 		</snapshotRepository>
-        <site>
-            <id>googlecode-docs</id>
-            <url>svn:svn+ssh:https://nds-logging.googlecode.com/svn/docs</url>
-        </site>
     </distributionManagement>
-    
-    <reporting>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.7</version>
-            </plugin>
-        </plugins>
-    </reporting>
 </project>
