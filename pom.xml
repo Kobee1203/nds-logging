@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>org.nds.logging</groupId>
 	<artifactId>nds-logging-parent</artifactId>
-	<version>1.0.0-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<packaging>pom</packaging>
 	<name>NDS Logging parent</name>
 
@@ -154,9 +153,9 @@ It is based on two types of log: android.util.Log: used to log an Android applic
 	</repositories>
 
 	<scm>
-        <url>https://nds-logging.googlecode.com/svn/trunk</url>
-        <connection>scm:svn:https://nds-logging.googlecode.com/svn/trunk</connection>
-        <developerConnection>scm:svn:https://nds-logging.googlecode.com/svn/trunk</developerConnection>
+        <url>https://nds-logging.googlecode.com/svn/tags/nds-logging-parent-1.0.0</url>
+        <connection>scm:svn:https://nds-logging.googlecode.com/svn/tags/nds-logging-parent-1.0.0</connection>
+        <developerConnection>scm:svn:https://nds-logging.googlecode.com/svn/tags/nds-logging-parent-1.0.0</developerConnection>
     </scm>
 
 	<distributionManagement>
