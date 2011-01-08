@@ -141,6 +141,26 @@ It is based on two types of log: android.util.Log: used to log an Android applic
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>2.2</version>
+				<configuration>
+					<descriptors>
+						<descriptor>assemblyDescriptor.xml</descriptor>
+					</descriptors>
+					<finalName>nds-logging</finalName>
+					<outputDirectory>${basedir}/target</outputDirectory>
+	        	</configuration>
+	        	<executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+			</plugin>
 		</plugins>
 	</build>
 
