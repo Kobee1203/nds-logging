@@ -1,1 +1,0 @@
-adb push local.prop /data/local.prop
