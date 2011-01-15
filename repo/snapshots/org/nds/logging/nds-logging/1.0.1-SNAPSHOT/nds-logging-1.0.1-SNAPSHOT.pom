@@ -50,7 +50,7 @@
 								
 								<gcupload username="${gc.username}" password="${gc.password}"
 									projectname="${project.artifactId}" 
-									filename="target/${project.artifactId}-${project.parent.version}.${project.packaging}"
+									filename="${project.artifactId}/target/${project.artifactId}-${project.parent.version}.${project.packaging}"
 									targetfilename="${project.artifactId}-${project.parent.version}.${project.packaging}" 
 									summary="Version ${project.parent.version} of ${project.artifactId}"
 									labels="${project.parent.version}, ${project.artifactId}, Logger, Android, Java, Log, commons, logging, Apache, JUnit, Unittest, Developer" />
