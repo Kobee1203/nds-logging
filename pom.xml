@@ -4,7 +4,7 @@
 
 	<groupId>org.nds.logging</groupId>
 	<artifactId>nds-logging-parent</artifactId>
-	<version>1.0.2</version>
+	<version>1.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<name>NDS Logging parent</name>
 
@@ -153,9 +153,9 @@ It is based on two types of log: android.util.Log: used to log an Android applic
 	</repositories>
 
 	<scm>
-        <url>https://nds-logging.googlecode.com/svn/tags/nds-logging-parent-1.0.2</url>
-        <connection>scm:svn:https://nds-logging.googlecode.com/svn/tags/nds-logging-parent-1.0.2</connection>
-        <developerConnection>scm:svn:https://nds-logging.googlecode.com/svn/tags/nds-logging-parent-1.0.2</developerConnection>
+        <url>https://nds-logging.googlecode.com/svn/trunk</url>
+        <connection>scm:svn:https://nds-logging.googlecode.com/svn/trunk</connection>
+        <developerConnection>scm:svn:https://nds-logging.googlecode.com/svn/trunk</developerConnection>
     </scm>
 
 	<distributionManagement>
