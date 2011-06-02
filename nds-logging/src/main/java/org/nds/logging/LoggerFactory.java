@@ -29,8 +29,11 @@ public class LoggerFactory {
     private final Map<String, Logger> instances = new HashMap<String, Logger>();
 
     private LoggerFactory() {
-        if (android.os.Build.ID != null) {
-            androidLoggable = true;
+        try {
+            if (android.os.Build.ID != null) {
+                androidLoggable = true;
+            }
+        } catch (Exception e) {
         }
     }
 
