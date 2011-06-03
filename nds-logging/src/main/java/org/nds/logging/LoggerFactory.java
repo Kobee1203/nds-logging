@@ -33,7 +33,7 @@ public class LoggerFactory {
             if (android.os.Build.ID != null) {
                 androidLoggable = true;
             }
-        } catch (Exception e) {
+        } catch (Throwable t) {
         }
     }
 
